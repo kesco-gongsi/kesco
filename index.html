@@ -32,14 +32,12 @@
         #upload-btn { background: #0055AA; color: white; }
         #track-btn { background: #f0f7ff; color: #0055AA; border: 1px solid #0055AA; }
         #clear-btn { background: #ffffff; color: #666; border: 1px solid #ddd; margin-top: 10px; }
-        #status { margin-top: 10px; font-size: 12px; color: #666; text-align: center; }
+        #status { margin-top: 10px; font-size: 12px; color: #666; text-align: center; font-weight: bold; }
 
-        /* 말풍선 스타일 보정 */
         .iw-item { border-bottom: 1px solid #eee; padding: 10px 0; }
         .iw-item:last-child { border-bottom: none; }
         .del-btn { display: block; margin-top: 8px; background: #ef4444; color: white; text-align: center; padding: 6px; border-radius: 6px; font-size: 11px; font-weight: bold; border: none; width: 100%; cursor: pointer; }
 
-        /* 내 위치 방향 화살표 */
         .my-location-marker { position: relative; width: 40px; height: 40px; pointer-events: none; }
         .direction-arrow {
             position: absolute; top: -10px; left: 10px; width: 20px; height: 25px;
@@ -62,7 +60,7 @@
             <button id="upload-btn" class="btn">📍 엑셀 데이터 등록</button>
             <button id="track-btn" class="btn">📡 위치 추적 시작</button>
             <button id="clear-btn" class="btn">🔄 전체 초기화</button>
-            <div id="status">지도가 준비되었습니다.</div>
+            <div id="status">시스템 준비 중...</div>
         </div>
     </div>
     <div id="map"></div>
@@ -81,22 +79,17 @@
             btn.innerText = box.classList.contains('collapsed') ? '메뉴 펴기' : '접기 ▲';
         }
 
-        // 방향 센서 핸들러 (아이폰/안드로이드 통합 보정)
+        // 방향 센서 핸들러
         function handleOrientation(event) {
             var heading = 0;
-            if (event.webkitCompassHeading) {
-                heading = event.webkitCompassHeading; // iOS
-            } else if (event.alpha !== null) {
-                // 안드로이드 (absolute 이벤트가 더 정확함)
-                heading = event.absolute ? event.alpha : 360 - event.alpha;
-            }
+            if (event.webkitCompassHeading) heading = event.webkitCompassHeading;
+            else if (event.alpha !== null) heading = event.absolute ? event.alpha : 360 - event.alpha;
             
             var arrow = document.getElementById('direction-arrow');
-            if (arrow) {
-                arrow.style.transform = 'rotate(' + heading + 'deg)';
-            }
+            if (arrow) arrow.style.transform = 'rotate(' + heading + 'deg)';
         }
 
+        // 초기화 및 맵 로드
         kakao.maps.load(function() {
             map = new kakao.maps.Map(document.getElementById('map'), { 
                 center: new kakao.maps.LatLng(35.9180, 127.1241), level: 8 
@@ -104,10 +97,7 @@
             
             clusterer = new kakao.maps.MarkerClusterer({
                 map: map, averageCenter: true, minLevel: 6,
-                styles: [{
-                    width : '40px', height : '40px', background: 'rgba(0, 85, 170, 0.9)',
-                    borderRadius: '20px', color: '#fff', textAlign: 'center', fontWeight: 'bold', lineHeight: '41px'
-                }]
+                styles: [{ width : '40px', height : '40px', background: 'rgba(0, 85, 170, 0.9)', borderRadius: '20px', color: '#fff', textAlign: 'center', fontWeight: 'bold', lineHeight: '41px' }]
             });
 
             geocoder = new kakao.maps.services.Geocoder();
@@ -116,100 +106,151 @@
                 if (currentInfoWindow) { currentInfoWindow.close(); currentInfoWindow = null; }
             });
 
+            // 저장된 데이터 불러오기
             var saved = localStorage.getItem('kesco_map_data');
-            if(saved) { currentSites = JSON.parse(saved); drawMarkers(); }
-
-            // 데이터 등록
-            document.getElementById('upload-btn').onclick = function() {
-                var file = document.getElementById('excel-file').files[0];
-                if(!file) return alert("파일을 선택해주세요.");
-                var reader = new FileReader();
-                reader.onload = function(e) {
-                    var workbook = XLSX.read(new Uint8Array(e.target.result), {type: 'array'});
-                    var json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-                    var successData = [];
-                    var count = 0;
-                    json.forEach(function(row, i) {
-                        setTimeout(function() {
-                            var addr = row['주소'];
-                            if(addr) {
-                                geocoder.addressSearch(addr, function(res, stat) {
-                                    if(stat === kakao.maps.services.Status.OK) {
-                                        successData.push({
-                                            id: Date.now() + i + Math.random(),
-                                            title: row['상호명'] || '이름없음',
-                                            lat: parseFloat(res[0].y), lng: parseFloat(res[0].x), addr: addr
-                                        });
-                                    }
-                                    count++;
-                                    document.getElementById('status').innerText = "변환 중: " + count + "/" + json.length;
-                                    if(count === json.length) {
-                                        currentSites = successData;
-                                        saveAndRender();
-                                        toggleMenu();
-                                    }
-                                });
-                            } else { count++; }
-                        }, i * 30);
-                    });
-                };
-                reader.readAsArrayBuffer(file);
-            };
-
-            // 위치 추적 및 방향 시작
-            document.getElementById('track-btn').onclick = function() {
-                if(watchId) {
-                    navigator.geolocation.clearWatch(watchId);
-                    watchId = null;
-                    window.removeEventListener('deviceorientation', handleOrientation);
-                    window.removeEventListener('deviceorientationabsolute', handleOrientation);
-                    if(myLocMarker) myLocMarker.setMap(null);
-                    myLocMarker = null;
-                    this.innerText = "📡 위치 추적 시작";
-                } else {
-                    // 방향 센서 활성화
-                    if (window.DeviceOrientationEvent) {
-                        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                            DeviceOrientationEvent.requestPermission().then(res => {
-                                if (res === 'granted') window.addEventListener('deviceorientation', handleOrientation);
-                            });
-                        } else {
-                            // 안드로이드용 absolute 이벤트 우선 사용
-                            window.addEventListener('deviceorientationabsolute', handleOrientation, true);
-                            window.addEventListener('deviceorientation', handleOrientation, true);
-                        }
-                    }
-
-                    if(navigator.geolocation) {
-                        watchId = navigator.geolocation.watchPosition(function(pos) {
-                            var moveLoc = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
-                            if(!myLocMarker) {
-                                var content = document.createElement('div');
-                                content.className = 'my-location-marker';
-                                content.innerHTML = '<div id="direction-arrow" class="direction-arrow"></div><div class="location-dot"></div>';
-                                myLocMarker = new kakao.maps.CustomOverlay({ position: moveLoc, content: content, xAnchor: 0.5, yAnchor: 0.5 });
-                                myLocMarker.setMap(map);
-                            } else { myLocMarker.setPosition(moveLoc); }
-                            map.setCenter(moveLoc);
-                        }, null, { enableHighAccuracy: true });
-                        this.innerText = "🛑 추적 중단";
-                    }
-                }
-            };
-
-            document.getElementById('clear-btn').onclick = function() {
-                if(confirm("모든 데이터를 삭제하시겠습니까?")) {
-                    localStorage.removeItem('kesco_map_data');
-                    location.reload();
-                }
-            };
+            if(saved) {
+                currentSites = JSON.parse(saved);
+                drawMarkers();
+                document.getElementById('status').innerText = currentSites.length + "개 데이터 로드됨";
+            } else {
+                document.getElementById('status').innerText = "파일을 등록해주세요.";
+            }
         });
 
-        // [중요] 마커 그리기 로직 (그룹화 적용)
+        // [수정] 버튼 클릭 시 파일 처리 로직 (맵 로딩과 별개로 작동)
+        document.getElementById('upload-btn').onclick = function() {
+            var fileInput = document.getElementById('excel-file');
+            var file = fileInput.files[0];
+            
+            if(!file) {
+                alert("먼저 엑셀 파일을 선택해주세요.");
+                return;
+            }
+
+            if(!geocoder) {
+                alert("지도 서비스가 아직 준비되지 않았습니다. 잠시 후 다시 시도해주세요.");
+                return;
+            }
+
+            document.getElementById('status').innerText = "데이터 읽는 중...";
+            var reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    var data = new Uint8Array(e.target.result);
+                    var workbook = XLSX.read(data, {type: 'array'});
+                    var sheetName = workbook.SheetNames[0];
+                    var json = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+                    
+                    if(json.length === 0) {
+                        alert("엑셀 내용이 비어있습니다.");
+                        return;
+                    }
+
+                    processExcelData(json);
+                } catch (err) {
+                    console.error(err);
+                    alert("엑셀 파일 처리 중 오류가 발생했습니다.");
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        };
+
+        function processExcelData(json) {
+            var successData = [];
+            var count = 0;
+            var total = json.length;
+
+            json.forEach(function(row, i) {
+                setTimeout(function() {
+                    var addr = row['주소'] || row[' 주소 ']; // 공백 대비
+                    var title = row['상호명'] || row[' 상호명 '] || '이름없음';
+
+                    if(addr) {
+                        geocoder.addressSearch(addr, function(res, stat) {
+                            if(stat === kakao.maps.services.Status.OK) {
+                                successData.push({
+                                    id: Date.now() + i + Math.random(),
+                                    title: title,
+                                    lat: parseFloat(res[0].y), lng: parseFloat(res[0].x), addr: addr
+                                });
+                            }
+                            count++;
+                            updateProgress(count, total, successData);
+                        });
+                    } else {
+                        count++;
+                        updateProgress(count, total, successData);
+                    }
+                }, i * 50); // API 과부하 방지 간격
+            });
+        }
+
+        function updateProgress(count, total, successData) {
+            document.getElementById('status').innerText = `변환 중... (${count}/${total})`;
+            if(count === total) {
+                if(successData.length === 0) {
+                    alert("좌표로 변환할 수 있는 주소가 없습니다. 주소 열을 확인해주세요.");
+                } else {
+                    currentSites = successData;
+                    saveAndRender();
+                    toggleMenu();
+                    alert(successData.length + "건의 등록이 완료되었습니다.");
+                }
+            }
+        }
+
+        // 위치 추적 버튼
+        document.getElementById('track-btn').onclick = function() {
+            if(watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+                window.removeEventListener('deviceorientationabsolute', handleOrientation);
+                window.removeEventListener('deviceorientation', handleOrientation);
+                if(myLocMarker) myLocMarker.setMap(null);
+                myLocMarker = null;
+                this.innerText = "📡 위치 추적 시작";
+                this.style.background = "#f0f7ff";
+            } else {
+                if (window.DeviceOrientationEvent) {
+                    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                        DeviceOrientationEvent.requestPermission().then(res => {
+                            if (res === 'granted') window.addEventListener('deviceorientation', handleOrientation);
+                        });
+                    } else {
+                        window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+                        window.addEventListener('deviceorientation', handleOrientation, true);
+                    }
+                }
+                if(navigator.geolocation) {
+                    watchId = navigator.geolocation.watchPosition(function(pos) {
+                        var moveLoc = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
+                        if(!myLocMarker) {
+                            var content = document.createElement('div');
+                            content.className = 'my-location-marker';
+                            content.innerHTML = '<div id="direction-arrow" class="direction-arrow"></div><div class="location-dot"></div>';
+                            myLocMarker = new kakao.maps.CustomOverlay({ position: moveLoc, content: content, xAnchor: 0.5, yAnchor: 0.5 });
+                            myLocMarker.setMap(map);
+                        } else { myLocMarker.setPosition(moveLoc); }
+                        map.setCenter(moveLoc);
+                    }, function(err) { alert("위치 정보를 가져올 수 없습니다."); }, { enableHighAccuracy: true });
+                    this.innerText = "🛑 추적 중단";
+                    this.style.background = "#333"; this.style.color = "#fff";
+                }
+            }
+        };
+
+        document.getElementById('clear-btn').onclick = function() {
+            if(confirm("모든 데이터를 삭제하시겠습니까?")) {
+                localStorage.removeItem('kesco_map_data');
+                location.reload();
+            }
+        };
+
         function drawMarkers() {
+            if(!clusterer) return;
             clusterer.clear();
             
-            // 1. 좌표 기반 그룹화
             var groups = {};
             currentSites.forEach(function(s) {
                 var key = s.lat.toFixed(6) + "," + s.lng.toFixed(6);
@@ -217,32 +258,24 @@
                 groups[key].push(s);
             });
 
-            // 2. 그룹별 마커 생성
             var markers = Object.values(groups).map(function(group) {
                 var first = group[0];
                 var m = new kakao.maps.Marker({ position: new kakao.maps.LatLng(first.lat, first.lng) });
                 
-                // 말풍선 내용 구성
                 var container = document.createElement('div');
                 container.style.padding = '15px'; container.style.background = 'white';
                 container.style.borderRadius = '12px'; container.style.width = '220px';
                 container.style.boxShadow = '0 4px 15px rgba(0,0,0,0.15)';
 
-                // 헤더 (ㅇㅇㅇ 외 N건)
                 var headerText = group.length > 1 ? `<b>${first.title}</b> 외 ${group.length - 1}건` : `<b>${first.title}</b>`;
                 var header = document.createElement('div');
-                header.style.borderBottom = '2px solid #0055AA';
-                header.style.paddingBottom = '8px';
-                header.style.marginBottom = '5px';
-                header.style.color = '#0055AA';
-                header.style.fontSize = '14px';
+                header.style.borderBottom = '2px solid #0055AA'; header.style.paddingBottom = '8px';
+                header.style.marginBottom = '5px'; header.style.color = '#0055AA'; header.style.fontSize = '14px';
                 header.innerHTML = headerText;
                 container.appendChild(header);
 
-                // 스크롤 가능한 리스트 영역
                 var listArea = document.createElement('div');
-                listArea.style.maxHeight = '200px';
-                listArea.style.overflowY = 'auto';
+                listArea.style.maxHeight = '200px'; listArea.style.overflowY = 'auto';
                 
                 group.forEach(function(item) {
                     var itemDiv = document.createElement('div');
@@ -266,7 +299,6 @@
                 });
                 
                 container.appendChild(listArea);
-
                 var iw = new kakao.maps.InfoWindow({ content: container, removable: true });
                 kakao.maps.event.addListener(m, 'click', function() { 
                     if (currentInfoWindow) currentInfoWindow.close();
@@ -281,7 +313,7 @@
         function saveAndRender() {
             localStorage.setItem('kesco_map_data', JSON.stringify(currentSites));
             drawMarkers();
-            document.getElementById('status').innerText = currentSites.length + "개의 사업장 관리 중";
+            document.getElementById('status').innerText = currentSites.length + "건 관리 중";
         }
     </script>
 </body>
