@@ -3,12 +3,15 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="color-scheme" content="light only">
     <title>KESCO 현장 점검지도</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=85ad2817ce8a886974a3fce65f856ab4&libraries=services,clusterer&autoload=false"></script>
     <style>
-        body { margin: 0; padding: 0; font-family: 'Pretendard', sans-serif; overflow: hidden; background: #f0f2f5; }
-        #map { width: 100%; height: 100vh; position: absolute; top: 0; left: 0; }
+        /* 다크모드 무시 및 라이트 테마 강제 */
+        :root { color-scheme: light; }
+        body { margin: 0; padding: 0; font-family: 'Pretendard', sans-serif; overflow: hidden; background: #f0f2f5; color: #333; }
+        #map { width: 100%; height: 100vh; position: absolute; top: 0; left: 0; background-color: #f9f9f9; }
 
         #upload-box {
             position: absolute; top: 15px; left: 15px; z-index: 1001; 
@@ -24,7 +27,6 @@
         #toggle-btn { cursor: pointer; background: #0055AA; border: none; color: white; font-size: 13px; padding: 10px 15px; border-radius: 8px; font-weight: bold; width: 100%; }
         h3 { margin: 15px 0 10px 0; font-size: 17px; color: #0055AA; display: flex; align-items: center; }
         
-        /* 커스텀 지도 타입 버튼 스타일 */
         .map-type-wrapper { display: flex; gap: 5px; margin-bottom: 15px; }
         .m-type-btn { flex: 1; padding: 8px; font-size: 12px; font-weight: bold; border: 1px solid #0055AA; border-radius: 6px; cursor: pointer; transition: 0.2s; }
         .m-type-btn.active { background: #0055AA; color: white; }
@@ -36,14 +38,14 @@
         #clear-btn { background: #ffffff; color: #666; border: 1px solid #ddd; margin-top: 10px; }
         #status { margin-top: 10px; font-size: 12px; color: #666; text-align: center; font-weight: bold; }
 
-        /* 말풍선 내부 스타일 */
+        /* 말풍선 내부 스타일 (화이트톤 강제) */
+        .iw-container { background-color: #ffffff !important; color: #333333 !important; }
         .iw-item { border-bottom: 1px solid #eee; padding: 12px 0; }
         .iw-item:last-child { border-bottom: none; }
         .absent-row { display: flex; align-items: center; margin: 8px 0; font-size: 12px; color: #ef4444; font-weight: bold; }
         .absent-row input { margin-right: 6px; width: 16px; height: 16px; }
         .memo-text { font-size: 11px; color: #059669; margin: 5px 0; font-style: italic; background: #ecfdf5; padding: 6px; border-radius: 4px; border-left: 3px solid #10b981; }
         
-        /* 버튼 공통 */
         .nav-btn { display: block; background: #0055AA; color: white; text-align: center; padding: 8px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: bold; margin-top: 8px; }
         .del-btn { display: block; margin-top: 5px; background: #fecaca; color: #b91c1c; text-align: center; padding: 8px; border-radius: 6px; font-size: 11px; font-weight: bold; border: none; width: 100%; cursor: pointer; }
 
@@ -79,7 +81,6 @@
         var currentSites = [];
         var currentInfoWindow = null;
         var myLocMarker = null;
-        var longClickTimer;
 
         var colorMap = { 1: "#0055AA", 2: "#EF4444", 3: "#22C55E", 4: "#F97316", 5: "#A855F7", 6: "#EC4899", 7: "#EAB308", 8: "#06B6D4", 9: "#78350F", 10: "#1F2937" };
 
@@ -90,7 +91,6 @@
             btn.innerText = box.classList.contains('collapsed') ? '메뉴 펴기' : '접기 ▲';
         }
 
-        // [추가] 커스텀 지도 타입 변경 함수
         function setMapType(type) {
             var roadBtn = document.getElementById('btn-road');
             var skyBtn = document.getElementById('btn-sky');
@@ -99,7 +99,7 @@
                 roadBtn.className = 'm-type-btn active';
                 skyBtn.className = 'm-type-btn inactive';
             } else {
-                map.setMapTypeId(kakao.maps.MapTypeId.HYBRID); // 위성+도로명
+                map.setMapTypeId(kakao.maps.MapTypeId.HYBRID);
                 skyBtn.className = 'm-type-btn active';
                 roadBtn.className = 'm-type-btn inactive';
             }
@@ -118,12 +118,10 @@
             clusterer = new kakao.maps.MarkerClusterer({ map: map, averageCenter: true, minLevel: 6, styles: [{ width : '40px', height : '40px', background: 'rgba(0, 85, 170, 0.9)', borderRadius: '20px', color: '#fff', textAlign: 'center', fontWeight: 'bold', lineHeight: '41px' }] });
             geocoder = new kakao.maps.services.Geocoder();
 
-            // [수정] 롱클릭(수동 마커) 감지 로직 강화
-            kakao.maps.event.addListener(map, 'mousedown', function(e) {
-                longClickTimer = setTimeout(function() { addManualMarker(e.latLng); }, 900);
+            // [수정] 모바일 롱클릭 대응: 카카오맵은 모바일 길게 누르기를 'rightclick'으로 인식합니다.
+            kakao.maps.event.addListener(map, 'rightclick', function(mouseEvent) {
+                addManualMarker(mouseEvent.latLng);
             });
-            kakao.maps.event.addListener(map, 'mouseup', function() { clearTimeout(longClickTimer); });
-            kakao.maps.event.addListener(map, 'dragstart', function() { clearTimeout(longClickTimer); });
 
             kakao.maps.event.addListener(map, 'click', function() {
                 if (currentInfoWindow) { currentInfoWindow.close(); currentInfoWindow = null; }
@@ -230,8 +228,11 @@
                 var markerImg = new kakao.maps.MarkerImage(imageSrc, new kakao.maps.Size(30, 40));
                 
                 var m = new kakao.maps.Marker({ position: new kakao.maps.LatLng(first.lat, first.lng), image: markerImg });
+                
+                // [수정] 말풍선 컨테이너 (화이트 배경 강제)
                 var container = document.createElement('div');
-                container.style.padding = '15px'; container.style.background = 'white'; container.style.borderRadius = '12px'; container.style.width = '220px'; container.style.boxShadow = '0 4px 15px rgba(0,0,0,0.15)';
+                container.className = 'iw-container';
+                container.style.padding = '15px'; container.style.backgroundColor = '#ffffff'; container.style.borderRadius = '12px'; container.style.width = '220px'; container.style.boxShadow = '0 4px 15px rgba(0,0,0,0.15)';
 
                 var headerText = group.length > 1 ? `<b>${first.title}</b> 외 ${group.length - 1}건` : `<b>${first.title}</b>`;
                 var header = document.createElement('div');
@@ -245,7 +246,7 @@
                 group.forEach(function(item) {
                     var itemDiv = document.createElement('div');
                     itemDiv.className = 'iw-item';
-                    itemDiv.innerHTML = `<div style="font-weight:bold; font-size:13px;">${item.title}</div><div style="font-size:11px; color:#666;">${item.addr}</div>`;
+                    itemDiv.innerHTML = `<div style="font-weight:bold; font-size:13px; color:#333;">${item.title}</div><div style="font-size:11px; color:#666;">${item.addr}</div>`;
                     
                     if(item.memo) {
                         var mDiv = document.createElement('div');
@@ -263,7 +264,6 @@
                     absentRow.appendChild(document.createTextNode(' 미점검 (부재)'));
                     itemDiv.appendChild(absentRow);
 
-                    // [복구] 길찾기 버튼
                     var navA = document.createElement('a');
                     navA.className = 'nav-btn';
                     navA.href = `https://map.kakao.com/link/to/${item.title},${item.lat},${item.lng}`;
