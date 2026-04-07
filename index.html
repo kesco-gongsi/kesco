@@ -18,52 +18,33 @@
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
             border: 1px solid #e1e4e8;
         }
-
-        #upload-box.collapsed { 
-            width: 100px; padding: 0; height: 42px; border: none; background: transparent; box-shadow: none;
-        }
-        
-        #upload-box.collapsed h3, 
-        #upload-box.collapsed #menu-content { display: none; }
+        #upload-box.collapsed { width: 100px; padding: 0; height: 42px; border: none; background: transparent; box-shadow: none; }
+        #upload-box.collapsed h3, #upload-box.collapsed #menu-content { display: none; }
 
         #toggle-btn {
-            cursor: pointer; background: #0055AA; border: none;
-            color: white; font-size: 13px; padding: 10px 15px; border-radius: 8px; 
-            font-weight: bold; width: 100%; transition: background 0.2s;
+            cursor: pointer; background: #0055AA; border: none; color: white; 
+            font-size: 13px; padding: 10px 15px; border-radius: 8px; font-weight: bold; width: 100%; 
             box-shadow: 0 4px 6px rgba(0,85,170,0.2);
         }
-        #toggle-btn:hover { background: #003d7a; }
         
-        #upload-box.collapsed #toggle-btn { height: 42px; border-radius: 10px; }
-
         h3 { margin: 0 0 15px 0; font-size: 17px; color: #0055AA; display: flex; align-items: center; }
-        
-        .btn {
-            width: 100%; padding: 12px; margin-bottom: 8px; border: none;
-            border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 13px;
-            transition: opacity 0.2s;
-        }
-        .btn:active { opacity: 0.8; }
-
+        .btn { width: 100%; padding: 12px; margin-bottom: 8px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 13px; }
         #upload-btn { background: #0055AA; color: white; }
         #track-btn { background: #f0f7ff; color: #0055AA; border: 1px solid #0055AA; }
         #clear-btn { background: #ffffff; color: #666; border: 1px solid #ddd; margin-top: 10px; }
-        
         #status { margin-top: 10px; font-size: 12px; color: #666; text-align: center; }
 
-        .del-btn {
-            display: block; margin-top: 8px; background: #ef4444; color: white;
-            text-align: center; padding: 8px; border-radius: 6px;
-            font-size: 11px; font-weight: bold; border: none; width: 100%; cursor: pointer;
-        }
+        /* 말풍선 스타일 보정 */
+        .iw-item { border-bottom: 1px solid #eee; padding: 10px 0; }
+        .iw-item:last-child { border-bottom: none; }
+        .del-btn { display: block; margin-top: 8px; background: #ef4444; color: white; text-align: center; padding: 6px; border-radius: 6px; font-size: 11px; font-weight: bold; border: none; width: 100%; cursor: pointer; }
 
-        /* 내 위치 방향 화살표 스타일 */
-        .my-location-marker { position: relative; width: 40px; height: 40px; }
+        /* 내 위치 방향 화살표 */
+        .my-location-marker { position: relative; width: 40px; height: 40px; pointer-events: none; }
         .direction-arrow {
-            position: absolute; top: -5px; left: 10px; width: 20px; height: 25px;
+            position: absolute; top: -10px; left: 10px; width: 20px; height: 25px;
             background: url('https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/direction_white.png') no-repeat;
-            background-size: contain; transition: transform 0.1s; transform-origin: center 20px;
-            z-index: 2;
+            background-size: contain; transition: transform 0.1s linear; transform-origin: center 20px; z-index: 2;
         }
         .location-dot {
             position: absolute; top: 10px; left: 10px; width: 20px; height: 20px;
@@ -90,9 +71,8 @@
         var map, clusterer, geocoder;
         var watchId = null;
         var currentSites = [];
-        var currentInfoWindow = null; // 현재 열린 말풍선 추적
-        var myLocMarker = null; // 방향 화살표 마커
-        var currentHeading = 0;
+        var currentInfoWindow = null;
+        var myLocMarker = null;
 
         function toggleMenu() {
             var box = document.getElementById('upload-box');
@@ -101,20 +81,25 @@
             btn.innerText = box.classList.contains('collapsed') ? '메뉴 펴기' : '접기 ▲';
         }
 
-        // 방향 센서 핸들러
+        // 방향 센서 핸들러 (아이폰/안드로이드 통합 보정)
         function handleOrientation(event) {
-            var heading = event.webkitCompassHeading || (360 - event.alpha);
-            if (heading) {
-                currentHeading = heading;
-                var arrow = document.getElementById('direction-arrow');
-                if (arrow) arrow.style.transform = 'rotate(' + currentHeading + 'deg)';
+            var heading = 0;
+            if (event.webkitCompassHeading) {
+                heading = event.webkitCompassHeading; // iOS
+            } else if (event.alpha !== null) {
+                // 안드로이드 (absolute 이벤트가 더 정확함)
+                heading = event.absolute ? event.alpha : 360 - event.alpha;
+            }
+            
+            var arrow = document.getElementById('direction-arrow');
+            if (arrow) {
+                arrow.style.transform = 'rotate(' + heading + 'deg)';
             }
         }
 
         kakao.maps.load(function() {
             map = new kakao.maps.Map(document.getElementById('map'), { 
-                center: new kakao.maps.LatLng(35.9180, 127.1241), 
-                level: 8 
+                center: new kakao.maps.LatLng(35.9180, 127.1241), level: 8 
             });
             
             clusterer = new kakao.maps.MarkerClusterer({
@@ -127,21 +112,14 @@
 
             geocoder = new kakao.maps.services.Geocoder();
 
-            // [개선] 지도 클릭 시 말풍선 닫기
             kakao.maps.event.addListener(map, 'click', function() {
-                if (currentInfoWindow) {
-                    currentInfoWindow.close();
-                    currentInfoWindow = null;
-                }
+                if (currentInfoWindow) { currentInfoWindow.close(); currentInfoWindow = null; }
             });
 
             var saved = localStorage.getItem('kesco_map_data');
-            if(saved) {
-                currentSites = JSON.parse(saved);
-                drawMarkers();
-            }
+            if(saved) { currentSites = JSON.parse(saved); drawMarkers(); }
 
-            // 엑셀 업로드 로직
+            // 데이터 등록
             document.getElementById('upload-btn').onclick = function() {
                 var file = document.getElementById('excel-file').files[0];
                 if(!file) return alert("파일을 선택해주세요.");
@@ -158,9 +136,9 @@
                                 geocoder.addressSearch(addr, function(res, stat) {
                                     if(stat === kakao.maps.services.Status.OK) {
                                         successData.push({
-                                            id: Date.now() + i,
+                                            id: Date.now() + i + Math.random(),
                                             title: row['상호명'] || '이름없음',
-                                            lat: res[0].y, lng: res[0].x, addr: addr
+                                            lat: parseFloat(res[0].y), lng: parseFloat(res[0].x), addr: addr
                                         });
                                     }
                                     count++;
@@ -178,48 +156,43 @@
                 reader.readAsArrayBuffer(file);
             };
 
-            // [개선] 위치 및 방향 추적 로직
+            // 위치 추적 및 방향 시작
             document.getElementById('track-btn').onclick = function() {
                 if(watchId) {
                     navigator.geolocation.clearWatch(watchId);
                     watchId = null;
                     window.removeEventListener('deviceorientation', handleOrientation);
+                    window.removeEventListener('deviceorientationabsolute', handleOrientation);
                     if(myLocMarker) myLocMarker.setMap(null);
                     myLocMarker = null;
                     this.innerText = "📡 위치 추적 시작";
-                    this.style.background = "#f0f7ff";
-                    this.style.color = "#0055AA";
                 } else {
-                    // 방향 센서 권한 요청 (iOS 대응)
-                    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                        DeviceOrientationEvent.requestPermission().then(res => {
-                            if (res === 'granted') window.addEventListener('deviceorientation', handleOrientation);
-                        });
-                    } else {
-                        window.addEventListener('deviceorientation', handleOrientation);
+                    // 방향 센서 활성화
+                    if (window.DeviceOrientationEvent) {
+                        if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                            DeviceOrientationEvent.requestPermission().then(res => {
+                                if (res === 'granted') window.addEventListener('deviceorientation', handleOrientation);
+                            });
+                        } else {
+                            // 안드로이드용 absolute 이벤트 우선 사용
+                            window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+                            window.addEventListener('deviceorientation', handleOrientation, true);
+                        }
                     }
 
                     if(navigator.geolocation) {
                         watchId = navigator.geolocation.watchPosition(function(pos) {
                             var moveLoc = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
-                            
                             if(!myLocMarker) {
                                 var content = document.createElement('div');
                                 content.className = 'my-location-marker';
                                 content.innerHTML = '<div id="direction-arrow" class="direction-arrow"></div><div class="location-dot"></div>';
-                                
-                                myLocMarker = new kakao.maps.CustomOverlay({
-                                    position: moveLoc, content: content, xAnchor: 0.5, yAnchor: 0.5
-                                });
+                                myLocMarker = new kakao.maps.CustomOverlay({ position: moveLoc, content: content, xAnchor: 0.5, yAnchor: 0.5 });
                                 myLocMarker.setMap(map);
-                            } else {
-                                myLocMarker.setPosition(moveLoc);
-                            }
+                            } else { myLocMarker.setPosition(moveLoc); }
                             map.setCenter(moveLoc);
-                        });
+                        }, null, { enableHighAccuracy: true });
                         this.innerText = "🛑 추적 중단";
-                        this.style.background = "#333";
-                        this.style.color = "#fff";
                     }
                 }
             };
@@ -232,35 +205,69 @@
             };
         });
 
+        // [중요] 마커 그리기 로직 (그룹화 적용)
         function drawMarkers() {
             clusterer.clear();
-            var markers = currentSites.map(function(s) {
-                var m = new kakao.maps.Marker({ position: new kakao.maps.LatLng(s.lat, s.lng) });
-                var content = document.createElement('div');
-                content.style.padding = '12px'; content.style.background = 'white';
-                content.style.borderRadius = '10px'; content.style.fontSize = '13px';
-                content.style.width = '200px'; content.style.color = '#333';
-                content.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
-                content.innerHTML = '<b style="color:#0055AA; font-size:14px;">'+s.title+'</b><div style="margin-top:5px; color:#666;">'+s.addr+'</div>' +
-                                    '<a href="https://map.kakao.com/link/to/'+s.title+','+s.lat+','+s.lng+'" target="_blank" style="display:block;margin-top:10px;background:#0055AA;text-align:center;padding:8px;border-radius:6px;text-decoration:none;color:white;font-weight:bold;">길찾기</a>';
-                
-                var delBtn = document.createElement('button');
-                delBtn.className = 'del-btn';
-                delBtn.innerText = '✅ 점검 완료 (삭제)';
-                delBtn.onclick = function() {
-                    if(confirm("이 마커를 삭제하시겠습니까?")) {
-                        // [개선] 삭제 시 말풍선도 즉시 닫기
-                        if (currentInfoWindow) {
-                            currentInfoWindow.close();
-                            currentInfoWindow = null;
-                        }
-                        currentSites = currentSites.filter(function(item) { return item.id !== s.id; });
-                        saveAndRender();
-                    }
-                };
-                content.appendChild(delBtn);
+            
+            // 1. 좌표 기반 그룹화
+            var groups = {};
+            currentSites.forEach(function(s) {
+                var key = s.lat.toFixed(6) + "," + s.lng.toFixed(6);
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(s);
+            });
 
-                var iw = new kakao.maps.InfoWindow({ content: content, removable: true });
+            // 2. 그룹별 마커 생성
+            var markers = Object.values(groups).map(function(group) {
+                var first = group[0];
+                var m = new kakao.maps.Marker({ position: new kakao.maps.LatLng(first.lat, first.lng) });
+                
+                // 말풍선 내용 구성
+                var container = document.createElement('div');
+                container.style.padding = '15px'; container.style.background = 'white';
+                container.style.borderRadius = '12px'; container.style.width = '220px';
+                container.style.boxShadow = '0 4px 15px rgba(0,0,0,0.15)';
+
+                // 헤더 (ㅇㅇㅇ 외 N건)
+                var headerText = group.length > 1 ? `<b>${first.title}</b> 외 ${group.length - 1}건` : `<b>${first.title}</b>`;
+                var header = document.createElement('div');
+                header.style.borderBottom = '2px solid #0055AA';
+                header.style.paddingBottom = '8px';
+                header.style.marginBottom = '5px';
+                header.style.color = '#0055AA';
+                header.style.fontSize = '14px';
+                header.innerHTML = headerText;
+                container.appendChild(header);
+
+                // 스크롤 가능한 리스트 영역
+                var listArea = document.createElement('div');
+                listArea.style.maxHeight = '200px';
+                listArea.style.overflowY = 'auto';
+                
+                group.forEach(function(item) {
+                    var itemDiv = document.createElement('div');
+                    itemDiv.className = 'iw-item';
+                    itemDiv.innerHTML = `<div style="font-weight:bold; font-size:13px;">${item.title}</div>
+                                         <div style="font-size:11px; color:#666; margin-top:2px;">${item.addr}</div>
+                                         <a href="https://map.kakao.com/link/to/${item.title},${item.lat},${item.lng}" target="_blank" style="display:inline-block; margin-top:5px; font-size:11px; color:#0055AA; text-decoration:none; font-weight:bold;">[길찾기]</a>`;
+                    
+                    var dBtn = document.createElement('button');
+                    dBtn.className = 'del-btn';
+                    dBtn.innerText = '✅ 점검 완료 (삭제)';
+                    dBtn.onclick = function() {
+                        if(confirm(`'${item.title}' 점검을 완료하셨습니까?`)) {
+                            currentSites = currentSites.filter(function(s) { return s.id !== item.id; });
+                            if (currentInfoWindow) { currentInfoWindow.close(); currentInfoWindow = null; }
+                            saveAndRender();
+                        }
+                    };
+                    itemDiv.appendChild(dBtn);
+                    listArea.appendChild(itemDiv);
+                });
+                
+                container.appendChild(listArea);
+
+                var iw = new kakao.maps.InfoWindow({ content: container, removable: true });
                 kakao.maps.event.addListener(m, 'click', function() { 
                     if (currentInfoWindow) currentInfoWindow.close();
                     iw.open(map, m); 
@@ -274,7 +281,7 @@
         function saveAndRender() {
             localStorage.setItem('kesco_map_data', JSON.stringify(currentSites));
             drawMarkers();
-            document.getElementById('status').innerText = currentSites.length + "개의 마커 표시 중";
+            document.getElementById('status').innerText = currentSites.length + "개의 사업장 관리 중";
         }
     </script>
 </body>
