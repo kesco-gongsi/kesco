@@ -18,24 +18,34 @@
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
             border: 1px solid #e1e4e8;
         }
-        #upload-box.collapsed { width: 100px; padding: 0; height: 42px; border: none; background: transparent; box-shadow: none; }
-        #upload-box.collapsed h3, #upload-box.collapsed #menu-content { display: none; }
+        #upload-box.collapsed { width: 110px; padding: 0; height: 42px; border: none; background: transparent; box-shadow: none; }
+        #upload-box.collapsed h3, #upload-box.collapsed #menu-content, #upload-box.collapsed .map-type-wrapper { display: none; }
 
         #toggle-btn { cursor: pointer; background: #0055AA; border: none; color: white; font-size: 13px; padding: 10px 15px; border-radius: 8px; font-weight: bold; width: 100%; }
-        h3 { margin: 0 0 15px 0; font-size: 17px; color: #0055AA; display: flex; align-items: center; }
+        h3 { margin: 15px 0 10px 0; font-size: 17px; color: #0055AA; display: flex; align-items: center; }
+        
+        /* 커스텀 지도 타입 버튼 스타일 */
+        .map-type-wrapper { display: flex; gap: 5px; margin-bottom: 15px; }
+        .m-type-btn { flex: 1; padding: 8px; font-size: 12px; font-weight: bold; border: 1px solid #0055AA; border-radius: 6px; cursor: pointer; transition: 0.2s; }
+        .m-type-btn.active { background: #0055AA; color: white; }
+        .m-type-btn.inactive { background: white; color: #0055AA; }
+
         .btn { width: 100%; padding: 12px; margin-bottom: 8px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 13px; }
         #upload-btn { background: #0055AA; color: white; }
         #track-btn { background: #f0f7ff; color: #0055AA; border: 1px solid #0055AA; }
         #clear-btn { background: #ffffff; color: #666; border: 1px solid #ddd; margin-top: 10px; }
         #status { margin-top: 10px; font-size: 12px; color: #666; text-align: center; font-weight: bold; }
 
-        /* 말풍선 아이템 스타일 보완 */
-        .iw-item { border-bottom: 1px solid #eee; padding: 10px 0; }
+        /* 말풍선 내부 스타일 */
+        .iw-item { border-bottom: 1px solid #eee; padding: 12px 0; }
         .iw-item:last-child { border-bottom: none; }
-        .absent-row { display: flex; align-items: center; margin-top: 8px; font-size: 12px; color: #ef4444; font-weight: bold; }
-        .absent-row input { margin-right: 5px; width: 16px; height: 16px; cursor: pointer; }
-        .memo-text { font-size: 11px; color: #059669; margin-top: 4px; font-style: italic; background: #ecfdf5; padding: 4px; border-radius: 4px; }
-        .del-btn { display: block; margin-top: 8px; background: #ef4444; color: white; text-align: center; padding: 6px; border-radius: 6px; font-size: 11px; font-weight: bold; border: none; width: 100%; cursor: pointer; }
+        .absent-row { display: flex; align-items: center; margin: 8px 0; font-size: 12px; color: #ef4444; font-weight: bold; }
+        .absent-row input { margin-right: 6px; width: 16px; height: 16px; }
+        .memo-text { font-size: 11px; color: #059669; margin: 5px 0; font-style: italic; background: #ecfdf5; padding: 6px; border-radius: 4px; border-left: 3px solid #10b981; }
+        
+        /* 버튼 공통 */
+        .nav-btn { display: block; background: #0055AA; color: white; text-align: center; padding: 8px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: bold; margin-top: 8px; }
+        .del-btn { display: block; margin-top: 5px; background: #fecaca; color: #b91c1c; text-align: center; padding: 8px; border-radius: 6px; font-size: 11px; font-weight: bold; border: none; width: 100%; cursor: pointer; }
 
         /* 현위치 방향 화살표 */
         .my-location-marker { position: relative; width: 40px; height: 40px; pointer-events: none; }
@@ -46,13 +56,19 @@
 <body>
     <div id="upload-box">
         <button id="toggle-btn" onclick="toggleMenu()">접기 ▲</button>
-        <div style="height: 15px;"></div> <h3>📊 점검 관리</h3>
+        
+        <div class="map-type-wrapper" style="margin-top:15px;">
+            <button id="btn-road" class="m-type-btn active" onclick="setMapType('roadmap')">일반지도</button>
+            <button id="btn-sky" class="m-type-btn inactive" onclick="setMapType('skyview')">위성사진</button>
+        </div>
+
+        <h3>📊 점검 관리</h3>
         <div id="menu-content">
             <input type="file" id="excel-file" accept=".xlsx, .xls" style="font-size:12px; margin-bottom:15px; width: 100%;">
             <button id="upload-btn" class="btn">📍 엑셀 데이터 등록</button>
             <button id="track-btn" class="btn">📡 위치 추적 시작</button>
             <button id="clear-btn" class="btn">🔄 전체 초기화</button>
-            <div id="status">지도를 길게 눌러 핀을 추가하세요</div>
+            <div id="status">지도를 길게 눌러 핀 추가</div>
         </div>
     </div>
     <div id="map"></div>
@@ -63,7 +79,7 @@
         var currentSites = [];
         var currentInfoWindow = null;
         var myLocMarker = null;
-        var longClickTimer; // 롱클릭 감지용 타이머
+        var longClickTimer;
 
         var colorMap = { 1: "#0055AA", 2: "#EF4444", 3: "#22C55E", 4: "#F97316", 5: "#A855F7", 6: "#EC4899", 7: "#EAB308", 8: "#06B6D4", 9: "#78350F", 10: "#1F2937" };
 
@@ -72,6 +88,21 @@
             var btn = document.getElementById('toggle-btn');
             box.classList.toggle('collapsed');
             btn.innerText = box.classList.contains('collapsed') ? '메뉴 펴기' : '접기 ▲';
+        }
+
+        // [추가] 커스텀 지도 타입 변경 함수
+        function setMapType(type) {
+            var roadBtn = document.getElementById('btn-road');
+            var skyBtn = document.getElementById('btn-sky');
+            if(type === 'roadmap') {
+                map.setMapTypeId(kakao.maps.MapTypeId.ROADMAP);
+                roadBtn.className = 'm-type-btn active';
+                skyBtn.className = 'm-type-btn inactive';
+            } else {
+                map.setMapTypeId(kakao.maps.MapTypeId.HYBRID); // 위성+도로명
+                skyBtn.className = 'm-type-btn active';
+                roadBtn.className = 'm-type-btn inactive';
+            }
         }
 
         function handleOrientation(event) {
@@ -84,20 +115,16 @@
 
         kakao.maps.load(function() {
             map = new kakao.maps.Map(document.getElementById('map'), { center: new kakao.maps.LatLng(35.9180, 127.1241), level: 8 });
-
-            map.addControl(new kakao.maps.MapTypeControl(), kakao.maps.ControlPosition.TOPRIGHT);
-            map.addControl(new kakao.maps.ZoomControl(), kakao.maps.ControlPosition.RIGHT);
-            
             clusterer = new kakao.maps.MarkerClusterer({ map: map, averageCenter: true, minLevel: 6, styles: [{ width : '40px', height : '40px', background: 'rgba(0, 85, 170, 0.9)', borderRadius: '20px', color: '#fff', textAlign: 'center', fontWeight: 'bold', lineHeight: '41px' }] });
             geocoder = new kakao.maps.services.Geocoder();
 
-            // [추가] 롱클릭 감지 로직 (모바일/PC 공용)
+            // [수정] 롱클릭(수동 마커) 감지 로직 강화
             kakao.maps.event.addListener(map, 'mousedown', function(e) {
-                longClickTimer = setTimeout(function() { addManualMarker(e.latLng); }, 800);
+                longClickTimer = setTimeout(function() { addManualMarker(e.latLng); }, 900);
             });
             kakao.maps.event.addListener(map, 'mouseup', function() { clearTimeout(longClickTimer); });
             kakao.maps.event.addListener(map, 'dragstart', function() { clearTimeout(longClickTimer); });
-            
+
             kakao.maps.event.addListener(map, 'click', function() {
                 if (currentInfoWindow) { currentInfoWindow.close(); currentInfoWindow = null; }
             });
@@ -106,26 +133,17 @@
             if(saved) { currentSites = JSON.parse(saved); drawMarkers(); }
         });
 
-        // 수동 마커 추가 함수
         function addManualMarker(latLng) {
-            var title = prompt("📍 새로운 장소의 이름을 입력하세요:", "현장 추가 지점");
+            var title = prompt("📍 새로운 장소의 이름을 입력하세요:", "");
             if(!title) return;
             var memo = prompt("📝 메모를 입력하세요 (없으면 확인):", "");
             
             var newSite = {
-                id: Date.now(),
-                title: title,
-                lat: latLng.getLat(),
-                lng: latLng.getLng(),
-                addr: "수동 등록 지점",
-                colorCode: 2, // 수동 등록은 빨간색(2번) 기본
-                isAbsent: false,
-                memo: memo || ""
+                id: Date.now(), title: title, lat: latLng.getLat(), lng: latLng.getLng(),
+                addr: "수동 등록 지점", colorCode: 2, isAbsent: false, memo: memo || ""
             };
-            
             currentSites.push(newSite);
             saveAndRender();
-            alert("마커가 추가되었습니다.");
         }
 
         document.getElementById('upload-btn').onclick = function() {
@@ -172,6 +190,8 @@
                 window.removeEventListener('deviceorientationabsolute', handleOrientation);
                 if(myLocMarker) myLocMarker.setMap(null); myLocMarker = null;
                 this.innerText = "📡 위치 추적 시작";
+                this.style.background = "#f0f7ff";
+                this.style.color = "#0055AA";
             } else {
                 if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
                     DeviceOrientationEvent.requestPermission().then(res => { if (res === 'granted') window.addEventListener('deviceorientation', handleOrientation); });
@@ -189,6 +209,7 @@
                         map.setCenter(moveLoc);
                     }, null, { enableHighAccuracy: true });
                     this.innerText = "🛑 추적 중단";
+                    this.style.background = "#333"; this.style.color = "#fff";
                 }
             }
         };
@@ -224,36 +245,34 @@
                 group.forEach(function(item) {
                     var itemDiv = document.createElement('div');
                     itemDiv.className = 'iw-item';
+                    itemDiv.innerHTML = `<div style="font-weight:bold; font-size:13px;">${item.title}</div><div style="font-size:11px; color:#666;">${item.addr}</div>`;
                     
-                    // 제목 및 주소
-                    var info = document.createElement('div');
-                    info.innerHTML = `<div style="font-weight:bold; font-size:13px;">${item.title}</div><div style="font-size:11px; color:#666;">${item.addr}</div>`;
-                    itemDiv.appendChild(info);
-
-                    // [추가] 메모 표시
                     if(item.memo) {
-                        var memoDiv = document.createElement('div');
-                        memoDiv.className = 'memo-text';
-                        memoDiv.innerText = "📝 " + item.memo;
-                        itemDiv.appendChild(memoDiv);
+                        var mDiv = document.createElement('div');
+                        mDiv.className = 'memo-text'; mDiv.innerText = "📝 " + item.memo;
+                        itemDiv.appendChild(mDiv);
                     }
 
-                    // [추가] 부재 체크박스
                     var absentRow = document.createElement('label');
                     absentRow.className = 'absent-row';
                     var checkbox = document.createElement('input');
                     checkbox.type = 'checkbox';
                     checkbox.checked = item.isAbsent || false;
-                    checkbox.onchange = function() {
-                        item.isAbsent = checkbox.checked;
-                        localStorage.setItem('kesco_map_data', JSON.stringify(currentSites)); // 상태 즉시 저장
-                    };
+                    checkbox.onchange = function() { item.isAbsent = checkbox.checked; localStorage.setItem('kesco_map_data', JSON.stringify(currentSites)); };
                     absentRow.appendChild(checkbox);
                     absentRow.appendChild(document.createTextNode(' 미점검 (부재)'));
                     itemDiv.appendChild(absentRow);
 
+                    // [복구] 길찾기 버튼
+                    var navA = document.createElement('a');
+                    navA.className = 'nav-btn';
+                    navA.href = `https://map.kakao.com/link/to/${item.title},${item.lat},${item.lng}`;
+                    navA.target = "_blank";
+                    navA.innerText = "🚗 길찾기";
+                    itemDiv.appendChild(navA);
+
                     var dBtn = document.createElement('button');
-                    dBtn.className = 'del-btn'; dBtn.innerText = '✅ 점검 완료 (삭제)';
+                    dBtn.className = 'del-btn'; dBtn.innerText = '점검완료 및 삭제';
                     dBtn.onclick = function() {
                         if(confirm(`'${item.title}' 삭제하시겠습니까?`)) {
                             currentSites = currentSites.filter(function(s) { return s.id !== item.id; });
