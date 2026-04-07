@@ -7,48 +7,72 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=85ad2817ce8a886974a3fce65f856ab4&libraries=services,clusterer&autoload=false"></script>
     <style>
-        body { margin: 0; padding: 0; font-family: sans-serif; overflow: hidden; background: #000; }
+        body { margin: 0; padding: 0; font-family: 'Pretendard', sans-serif; overflow: hidden; background: #f0f2f5; }
         #map { width: 100%; height: 100vh; position: absolute; top: 0; left: 0; }
 
-        /* 메뉴창 스타일 */
+        /* [수정] 전체 메뉴창 스타일: 화이트 & 블루 톤 */
         #upload-box {
-            position: absolute; top: 10px; left: 10px; z-index: 1001; 
-            background: rgba(20, 20, 20, 0.9); color: white;
-            padding: 15px; border-radius: 12px; width: 260px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
-            transition: all 0.3s ease; border: 1px solid #444;
+            position: absolute; top: 15px; left: 15px; z-index: 1001; 
+            background: rgba(255, 255, 255, 0.95); color: #333;
+            padding: 20px; border-radius: 14px; width: 260px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+            border: 1px solid #e1e4e8;
         }
-        #upload-box.collapsed { height: 35px; width: 100px; overflow: hidden; padding: 8px 12px; background: rgba(0,0,0,0.8); }
 
+        /* [수정] 접혔을 때: 너비를 버튼에 맞게 조절하고 내부 요소 숨김 */
+        #upload-box.collapsed { 
+            width: 100px; padding: 0; height: 42px; border: none; background: transparent; box-shadow: none;
+        }
+        
+        /* 접혔을 때 제목과 콘텐츠를 완전히 숨김 (글자 잘림 방지) */
+        #upload-box.collapsed h3, 
+        #upload-box.collapsed #menu-content { display: none; }
+
+        /* [수정] 토글 버튼 스타일: 블루 계열 */
         #toggle-btn {
-            float: right; cursor: pointer; background: #fae100; border: none;
-            color: #000; font-size: 11px; padding: 4px 8px; border-radius: 4px; font-weight: bold;
+            cursor: pointer; background: #0055AA; border: none;
+            color: white; font-size: 13px; padding: 10px 15px; border-radius: 8px; 
+            font-weight: bold; width: 100%; transition: background 0.2s;
+            box-shadow: 0 4px 6px rgba(0,85,170,0.2);
+        }
+        #toggle-btn:hover { background: #003d7a; }
+        
+        /* 접힌 상태에서의 버튼 스타일 */
+        #upload-box.collapsed #toggle-btn {
+            height: 42px; border-radius: 10px;
         }
 
-        h3 { margin: 0 0 10px 0; font-size: 15px; color: #fae100; }
+        h3 { margin: 0 0 15px 0; font-size: 17px; color: #0055AA; display: flex; align-items: center; }
+        
         .btn {
-            width: 100%; padding: 10px; margin-bottom: 6px; border: none;
-            border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px;
+            width: 100%; padding: 12px; margin-bottom: 8px; border: none;
+            border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 13px;
+            transition: opacity 0.2s;
         }
-        #upload-btn { background: #2563eb; color: white; }
-        #track-btn { background: #059669; color: white; }
-        #clear-btn { background: #b91c1c; color: white; }
-        #status { margin-top: 8px; font-size: 11px; color: #aaa; text-align: center; }
+        .btn:active { opacity: 0.8; }
 
-        /* 말풍선 내 삭제 버튼 스타일 */
+        /* 버튼들 블루/그레이 톤으로 변경 */
+        #upload-btn { background: #0055AA; color: white; }
+        #track-btn { background: #f0f7ff; color: #0055AA; border: 1px solid #0055AA; }
+        #clear-btn { background: #ffffff; color: #666; border: 1px solid #ddd; margin-top: 10px; }
+        
+        #status { margin-top: 10px; font-size: 12px; color: #666; text-align: center; }
+
+        /* 말풍선 내 길찾기 버튼 블루로 변경 */
         .del-btn {
-            display: block; margin-top: 8px; background: #ff4d4d; color: white;
-            text-align: center; padding: 6px; border-radius: 4px; text-decoration: none;
-            font-size: 11px; font-weight: bold; border: none; width: 100%;
+            display: block; margin-top: 8px; background: #ef4444; color: white;
+            text-align: center; padding: 8px; border-radius: 6px;
+            font-size: 11px; font-weight: bold; border: none; width: 100%; cursor: pointer;
         }
     </style>
 </head>
 <body>
     <div id="upload-box">
         <button id="toggle-btn" onclick="toggleMenu()">접기 ▲</button>
-        <h3>📊 점검 관리</h3>
+        <div style="height: 15px;"></div> <h3>📊 점검 관리</h3>
         <div id="menu-content">
-            <input type="file" id="excel-file" accept=".xlsx, .xls" style="font-size:11px; margin-bottom:10px;">
+            <input type="file" id="excel-file" accept=".xlsx, .xls" style="font-size:12px; margin-bottom:15px; width: 100%;">
             <button id="upload-btn" class="btn">📍 엑셀 데이터 등록</button>
             <button id="track-btn" class="btn">📡 위치 추적 시작</button>
             <button id="clear-btn" class="btn">🔄 전체 초기화</button>
@@ -62,11 +86,17 @@
         var watchId = null;
         var currentSites = [];
 
+        // [수정] 메뉴 토글 로직
         function toggleMenu() {
             var box = document.getElementById('upload-box');
             var btn = document.getElementById('toggle-btn');
             box.classList.toggle('collapsed');
-            btn.innerText = box.classList.contains('collapsed') ? '메뉴 펴기' : '접기 ▲';
+            
+            if(box.classList.contains('collapsed')) {
+                btn.innerText = '메뉴 펴기';
+            } else {
+                btn.innerText = '접기 ▲';
+            }
         }
 
         kakao.maps.load(function() {
@@ -75,7 +105,6 @@
                 level: 8 
             });
             
-            // 1. 클러스터러 설정 (겹칠 때 숫자 표시)
             clusterer = new kakao.maps.MarkerClusterer({
                 map: map,
                 averageCenter: true,
@@ -83,8 +112,8 @@
                 disableClickZoom: false,
                 styles: [{
                     width : '40px', height : '40px',
-                    background: 'rgba(250, 225, 0, 0.9)',
-                    borderRadius: '20px', color: '#000',
+                    background: 'rgba(0, 85, 170, 0.9)', // 클러스터러도 블루 톤
+                    borderRadius: '20px', color: '#fff',
                     textAlign: 'center', fontWeight: 'bold',
                     lineHeight: '41px'
                 }]
@@ -98,7 +127,6 @@
                 drawMarkers();
             }
 
-            // [등록 버튼]
             document.getElementById('upload-btn').onclick = function() {
                 var file = document.getElementById('excel-file').files[0];
                 if(!file) return alert("파일을 선택해주세요.");
@@ -117,7 +145,7 @@
                                 geocoder.addressSearch(addr, function(res, stat) {
                                     if(stat === kakao.maps.services.Status.OK) {
                                         successData.push({
-                                            id: Date.now() + i, // 고유 ID 부여
+                                            id: Date.now() + i,
                                             title: row['상호명'] || '이름없음',
                                             lat: res[0].y, lng: res[0].x, addr: addr
                                         });
@@ -137,27 +165,27 @@
                 reader.readAsArrayBuffer(file);
             };
 
-            // [위치 추적 버튼]
             document.getElementById('track-btn').onclick = function() {
                 if(watchId) {
                     navigator.geolocation.clearWatch(watchId);
                     watchId = null;
                     if(myLocCircle) myLocCircle.setMap(null);
                     this.innerText = "📡 위치 추적 시작";
-                    this.style.background = "#059669";
+                    this.style.background = "#f0f7ff";
+                    this.style.color = "#0055AA";
                 } else {
                     if(navigator.geolocation) {
+                        var self = this;
                         watchId = navigator.geolocation.watchPosition(function(pos) {
                             var moveLoc = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
-                            // 2. 내 위치 원형 마커로 표시
                             if(!myLocCircle) {
                                 myLocCircle = new kakao.maps.Circle({
                                     center: moveLoc,
-                                    radius: 15,
-                                    strokeWeight: 2,
+                                    radius: 20,
+                                    strokeWeight: 3,
                                     strokeColor: '#FFFFFF',
                                     strokeOpacity: 1,
-                                    fillColor: '#2563eb',
+                                    fillColor: '#0055AA',
                                     fillOpacity: 1
                                 });
                                 myLocCircle.setMap(map);
@@ -165,12 +193,12 @@
                             map.setCenter(moveLoc);
                         });
                         this.innerText = "🛑 추적 중단";
-                        this.style.background = "#444";
+                        this.style.background = "#333";
+                        this.style.color = "#fff";
                     }
                 }
             };
 
-            // [초기화 버튼]
             document.getElementById('clear-btn').onclick = function() {
                 if(confirm("모든 데이터를 삭제하시겠습니까?")) {
                     localStorage.removeItem('kesco_map_data');
@@ -179,21 +207,21 @@
             };
         });
 
-        // 4. 마커 삭제 기능을 포함한 그리기 함수
         function drawMarkers() {
             clusterer.clear();
             var markers = currentSites.map(function(s) {
                 var m = new kakao.maps.Marker({ position: new kakao.maps.LatLng(s.lat, s.lng) });
                 
                 var content = document.createElement('div');
-                content.style.padding = '10px';
+                content.style.padding = '12px';
                 content.style.background = 'white';
-                content.style.borderRadius = '8px';
-                content.style.fontSize = '12px';
-                content.style.width = '180px';
-                content.style.color = '#000';
-                content.innerHTML = '<b>'+s.title+'</b><br>'+s.addr +
-                                    '<a href="https://map.kakao.com/link/to/'+s.title+','+s.lat+','+s.lng+'" target="_blank" style="display:block;margin-top:8px;background:#fae100;text-align:center;padding:6px;border-radius:4px;text-decoration:none;color:black;font-weight:bold;">길찾기</a>';
+                content.style.borderRadius = '10px';
+                content.style.fontSize = '13px';
+                content.style.width = '200px';
+                content.style.color = '#333';
+                content.style.boxShadow = '0 2px 10px rgba(0,0,0,0.1)';
+                content.innerHTML = '<b style="color:#0055AA; font-size:14px;">'+s.title+'</b><div style="margin-top:5px; color:#666;">'+s.addr+'</div>' +
+                                    '<a href="https://map.kakao.com/link/to/'+s.title+','+s.lat+','+s.lng+'" target="_blank" style="display:block;margin-top:10px;background:#0055AA;text-align:center;padding:8px;border-radius:6px;text-decoration:none;color:white;font-weight:bold;">길찾기</a>';
                 
                 var delBtn = document.createElement('button');
                 delBtn.className = 'del-btn';
