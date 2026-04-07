@@ -14,21 +14,20 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.3); width: 260px; border: 2px solid #fae100;
         }
         #upload-box h3 { margin: 0 0 10px 0; font-size: 15px; }
-        #excel-file { width: 100%; font-size: 13px; margin-bottom: 10px; }
+        #excel-file { width: 100%; font-size: 12px; margin-bottom: 10px; }
         button {
             width: 100%; padding: 10px; border: none; border-radius: 6px; 
             font-weight: bold; cursor: pointer; margin-top: 6px; font-size: 14px;
         }
         #upload-btn { background: #007bff; color: white; padding: 12px; }
-        #loc-watch-btn { background: #28a745; color: white; } /* 내 위치 추적 버튼 */
+        #loc-watch-btn { background: #28a745; color: white; }
         #clear-btn { background: #dc3545; color: white; font-size: 12px; }
         #status { margin-top: 12px; font-size: 12px; font-weight: bold; color: #333; line-height: 1.4; }
         
-        /* 내 위치 표시용 커스텀 오버레이 스타일 */
         .my-loc-dot {
-            width: 15px; height: 15px; background: #007bff;
+            width: 18px; height: 18px; background: #007bff;
             border: 3px solid white; border-radius: 50%;
-            box-shadow: 0 0 8px rgba(0,123,255,0.8);
+            box-shadow: 0 0 10px rgba(0,123,255,0.8);
         }
     </style>
 </head>
@@ -48,8 +47,9 @@
     
     <script>
         var map, clusterer, geocoder, watchId = null;
-        var myLocMarker = null; // 내 실시간 위치 표시용
+        var myLocMarker = null;
 
+        // 1. 지도 로드 대기
         kakao.maps.load(function() {
             initMap();
         });
@@ -59,7 +59,7 @@
             statusEl.innerText = '✅ 준비 완료';
 
             map = new kakao.maps.Map(document.getElementById('map'), {
-                center: new kakao.maps.LatLng(36.3, 127.5),
+                center: new kakao.maps.LatLng(36.35, 127.5),
                 level: 12
             });
             clusterer = new kakao.maps.MarkerClusterer({ map: map, averageCenter: true, minLevel: 7 });
@@ -76,7 +76,7 @@
             document.getElementById('clear-btn').onclick = clearData;
         }
 
-        // [핵심] 실시간 위치 추적 토글 함수
+        // 2. 실시간 위치 추적 (마커와 동시에 보기 가능)
         function toggleWatchLocation() {
             var btn = document.getElementById('loc-watch-btn');
             var statusEl = document.getElementById('status');
@@ -85,6 +85,47 @@
                 navigator.geolocation.clearWatch(watchId);
                 watchId = null;
                 if (myLocMarker) myLocMarker.setMap(null);
+                myLocMarker = null;
                 btn.innerText = "📍 내 위치 추적 시작";
                 btn.style.background = "#28a745";
-                statusEl.innerText = "내 위치 추적 중단";
+                statusEl.innerText = "내 위치 추적 중단됨";
+            } else {
+                if (!navigator.geolocation) { alert("위치 정보를 지원하지 않습니다."); return; }
+                btn.innerText = "🛑 추적 중단";
+                btn.style.background = "#ffc107";
+                btn.style.color = "black";
+
+                watchId = navigator.geolocation.watchPosition(function(pos) {
+                    var locPos = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
+                    if (!myLocMarker) {
+                        myLocMarker = new kakao.maps.CustomOverlay({
+                            position: locPos,
+                            content: '<div class="my-loc-dot"></div>',
+                            map: map
+                        });
+                        map.setCenter(locPos); // 처음 활성화 시 내 위치로 이동
+                        map.setLevel(5);
+                    } else {
+                        myLocMarker.setPosition(locPos);
+                    }
+                    statusEl.innerText = "📡 실시간 위치 수신 중...";
+                }, function(err) {
+                    statusEl.innerText = "⚠️ 위치 수신 실패 (권한 확인)";
+                }, { enableHighAccuracy: true });
+            }
+        }
+
+        // 3. 마커 그리기 (전국 어디든 첫 주소로 자동 이동)
+        function drawMarkers(sites) {
+            clusterer.clear();
+            var markers = sites.map(function (s) {
+                var marker = new kakao.maps.Marker({ position: new kakao.maps.LatLng(s.lat, s.lng) });
+                var iwContent = '<div style="padding:10px;font-size:12px;width:200px;">' +
+                                '<b>' + s.title + '</b><br><span style="color:#555;">' + s.address + '</span>' +
+                                '<a href="https://map.kakao.com/link/to/' + encodeURIComponent(s.title) + ',' + s.lat + ',' + s.lng + '" target="_blank" style="display:block;margin-top:8px;background:#fae100;text-align:center;padding:7px;border-radius:4px;text-decoration:none;color:black;font-weight:bold;">길찾기</a></div>';
+                var iw = new kakao.maps.InfoWindow({ content: iwContent, removable: true });
+                kakao.maps.event.addListener(marker, 'click', function () { iw.open(map, marker); });
+                return marker;
+            });
+            clusterer.addMarkers(markers);
+            if (markers
