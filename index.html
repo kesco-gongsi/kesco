@@ -162,7 +162,7 @@
         }
 
         // ==========================================
-        // ⚡ GitHub CSV 파일 조회 기능
+        // ⚡ GitHub CSV 파일 조회 기능 (모바일 호환성 & 최단거리 완비)
         // ==========================================
         async function searchPole() {
             var poleNum = document.getElementById('pole-input').value.toUpperCase().trim();
@@ -175,7 +175,9 @@
             statusEl.innerText = "검색 중...";
 
             var fileKey = poleNum.substring(0, 4);
-            var url = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${fileKey}.csv`;
+            
+            // 💡 [수정완료] 모바일 크롬 캐시 뚫기용 꼬리표(?t=시간) 장착!
+            var url = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${fileKey}.csv?t=${new Date().getTime()}`;
 
             try {
                 const response = await fetch(url);
@@ -202,30 +204,24 @@
                 }
 
                 if (foundList.length > 0) {
-                    // 💡 [핵심 로직] 기준점 결정 (내 위치 > 마지막 마커 순서)
                     var refPoint = null;
                     
                     if (myLocMarker) {
-                        // 1순위: GPS 위치 추적 중이면 내 현재 위치 기준
                         refPoint = { lat: myLocMarker.getPosition().getLat(), lng: myLocMarker.getPosition().getLng() };
                     } else if (currentSites.length > 0) {
-                        // 2순위: GPS는 없지만 지도에 찍힌 마커가 있다면 가장 최근 마커 기준
                         var lastSite = currentSites[currentSites.length - 1];
                         refPoint = { lat: lastSite.lat, lng: lastSite.lng };
                     }
 
-                    // 💡 기준점이 존재할 때만 '가장 가까운 1곳'만 남기기
                     if (refPoint) {
                         foundList.sort(function(a, b) {
                             var distA = getDistance(refPoint.lat, refPoint.lng, a.lat, a.lng);
                             var distB = getDistance(refPoint.lat, refPoint.lng, b.lat, b.lng);
-                            return distA - distB; // 오름차순 정렬
+                            return distA - distB; 
                         });
-                        // 가장 가까운 딱 1개만 선택
                         foundList = [foundList[0]];
                     }
 
-                    // 마커 표시 프로세스
                     foundList.forEach(function(found) {
                         var poleSite = {
                             id: crypto.randomUUID(),
@@ -239,7 +235,7 @@
                     
                     saveAndRender();
                     map.setCenter(new kakao.maps.LatLng(foundList[0].lat, foundList[0].lng));
-                    map.setLevel(2); // 현장이 잘 보이도록 확대
+                    map.setLevel(2); 
                     
                     if (refPoint) {
                         statusEl.innerText = "현재 위치 기반 최단거리 조회 성공!";
@@ -253,7 +249,8 @@
                 }
             } catch (error) {
                 console.error("조회 에러:", error);
-                alert("데이터 조회에 실패했습니다. 네트워크 상태를 확인해주세요.");
+                // 💡 [수정완료] 모바일에서 에러 원인을 파악하기 쉽게 창 띄우기
+                alert(`데이터 조회에 실패했습니다.\n에러 원인: ${error.message}\n네트워크를 확인해주세요.`);
                 statusEl.innerText = "오류 발생";
             }
         }
