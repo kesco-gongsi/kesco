@@ -149,7 +149,6 @@
             if(saved) { currentSites = JSON.parse(saved); drawMarkers(); }
         });
 
-        // 💡 두 좌표 사이의 거리를 계산하는 도우미 함수 (km 단위)
         function getDistance(lat1, lon1, lat2, lon2) {
             const R = 6371; 
             const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -161,9 +160,6 @@
             return R * c;
         }
 
-        // ==========================================
-        // ⚡ GitHub CSV 파일 조회 기능 (모바일 호환성 & 최단거리 완비)
-        // ==========================================
         async function searchPole() {
             var poleNum = document.getElementById('pole-input').value.toUpperCase().trim();
             if (poleNum.length !== 8) {
@@ -175,8 +171,6 @@
             statusEl.innerText = "검색 중...";
 
             var fileKey = poleNum.substring(0, 4);
-            
-            // 💡 [수정완료] 모바일 크롬 캐시 뚫기용 꼬리표(?t=시간) 장착!
             var url = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${fileKey}.csv?t=${new Date().getTime()}`;
 
             try {
@@ -194,12 +188,18 @@
                 for (var i = 1; i < lines.length; i++) {
                     var cols = lines[i].split(',');
                     if (cols[0] && cols[0].trim().toUpperCase() === poleNum) {
-                        foundList.push({
-                            meshno: cols[0].trim(),
-                            addr: cols[1] ? cols[1].trim() : "주소 정보 없음",
-                            lng: parseFloat(cols[2]),
-                            lat: parseFloat(cols[3])
-                        });
+                        // 💡 [안전장치 추가] 좌표가 유효한지 확인하고 담기
+                        var lngVal = parseFloat(cols[2]);
+                        var latVal = parseFloat(cols[3]);
+                        
+                        if (!isNaN(latVal) && !isNaN(lngVal)) {
+                            foundList.push({
+                                meshno: cols[0].trim(),
+                                addr: cols[1] ? cols[1].trim() : "주소 정보 없음",
+                                lng: lngVal,
+                                lat: latVal
+                            });
+                        }
                     }
                 }
 
@@ -249,7 +249,6 @@
                 }
             } catch (error) {
                 console.error("조회 에러:", error);
-                // 💡 [수정완료] 모바일에서 에러 원인을 파악하기 쉽게 창 띄우기
                 alert(`데이터 조회에 실패했습니다.\n에러 원인: ${error.message}\n네트워크를 확인해주세요.`);
                 statusEl.innerText = "오류 발생";
             }
@@ -349,7 +348,11 @@
             clusterer.clear();
             var groups = {};
             currentSites.forEach(function(s) {
-                var key = s.lat.toFixed(6) + "," + s.lng.toFixed(6);
+                // 💡 [안전장치 추가] 불량 데이터(좌표 없음)가 있으면 무시하고 패스해서 앱 뻗는 현상 방지
+                if (s.lat == null || s.lng == null || isNaN(s.lat) || isNaN(s.lng)) return; 
+
+                // 강제로 숫자로 변환 후 소수점 처리하여 에러 원천 차단
+                var key = Number(s.lat).toFixed(6) + "," + Number(s.lng).toFixed(6);
                 if (!groups[key]) groups[key] = []; groups[key].push(s);
             });
 
