@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="color-scheme" content="light only">
-    <title>KESCO 현장 점검지도 (NDIS 연동)</title>
+    <title>KESCO 현장 점검지도 (카카오)</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=85ad2817ce8a886974a3fce65f856ab4&libraries=services,clusterer&autoload=false"></script>
@@ -75,7 +75,7 @@
             <div class="input-group">
                 <input type="text" id="pole-input" placeholder="인입주번호 8자리 입력" maxlength="8">
             </div>
-            <button id="pole-search-btn" class="btn" onclick="searchPoleFromDB()">🔍 인입주 위치 찾기</button>
+            <button id="pole-search-btn" class="btn" onclick="searchPole()">🔍 인입주 위치 찾기</button>
             
             <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
 
@@ -90,11 +90,11 @@
 
     <script>
         // ==========================================
-        // 🔑 사용자님의 Supabase 정보 입력칸
+        // 🔑 GitHub 저장소 정보
         // ==========================================
-        // 주의: URL 끝에 빗금(/) 없이 적어주세요.
-        const SUPABASE_URL = "https://wkamzwfvjirhyhxjlhve.supabase.co"; 
-        const SUPABASE_KEY = "sb_publishable_2TVavGJcF9SLJKjX66AKOQ_0H392OhB";
+        const GITHUB_USER = "kesco-gongsi";
+        const GITHUB_REPO = "ndis-data1";
+        const GITHUB_BRANCH = "main";
         // ==========================================
 
         var map, clusterer, geocoder;
@@ -103,6 +103,7 @@
         var currentInfoWindow = null;
         var myLocMarker = null;
         var isDistrictOn = false;
+        var isAbsoluteOrientation = false;
 
         var colorMap = { 1: "#0055AA", 2: "#EF4444", 3: "#22C55E", 4: "#F97316", 5: "#A855F7", 6: "#EC4899", 7: "#EAB308", 8: "#06B6D4", 9: "#78350F", 10: "#1F2937" };
 
@@ -149,9 +150,9 @@
         });
 
         // ==========================================
-        // ⚡ Supabase DB 조회 기능
+        // ⚡ GitHub CSV 파일 조회 기능
         // ==========================================
-        async function searchPoleFromDB() {
+        async function searchPole() {
             var poleNum = document.getElementById('pole-input').value.toUpperCase().trim();
             if (poleNum.length !== 8) {
                 alert("인입주번호 8자리를 입력해주세요. (예: 1234A567)");
@@ -159,47 +160,58 @@
             }
 
             var statusEl = document.getElementById('status');
-            statusEl.innerText = "DB 검색 중...";
+            statusEl.innerText = "검색 중...";
+
+            // 앞 4자리로 파일명 결정
+            var fileKey = poleNum.substring(0, 4);
+            var url = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${fileKey}.csv`;
 
             try {
-                // Supabase API 호출 (테이블 이름: ndis_poles, 칼럼 이름: meshno 기준)
-                const response = await fetch(`${SUPABASE_URL}/rest/v1/ndis_poles?meshno=eq.${poleNum}&select=*`, {
-                    method: 'GET',
-                    headers: {
-                        'apikey': SUPABASE_KEY,
-                        'Authorization': `Bearer ${SUPABASE_KEY}`
+                const response = await fetch(url);
+                if (!response.ok) {
+                    alert("해당 데이터 파일을 찾을 수 없습니다. (" + fileKey + ".csv)");
+                    statusEl.innerText = "조회 실패";
+                    return;
+                }
+
+                const text = await response.text();
+                const lines = text.trim().split('\n');
+                // 헤더: meshno,addr,x,y
+                var found = null;
+                for (var i = 1; i < lines.length; i++) {
+                    var cols = lines[i].split(',');
+                    if (cols[0] && cols[0].trim().toUpperCase() === poleNum) {
+                        found = {
+                            meshno: cols[0].trim(),
+                            addr: cols[1] ? cols[1].trim() : "주소 정보 없음",
+                            lng: parseFloat(cols[2]),
+                            lat: parseFloat(cols[3])
+                        };
+                        break;
                     }
-                });
+                }
 
-                const data = await response.json();
-
-                if (data && data.length > 0) {
-                    var poleData = data[0]; // 검색된 첫 번째 결과
-                    var poleLat = parseFloat(poleData.lat);
-                    var poleLng = parseFloat(poleData.lng);
-                    var poleAddr = poleData.addr || "주소 정보 없음";
-
+                if (found) {
                     var poleSite = {
-                        id: Date.now(), title: "전주: " + poleData.meshno, 
-                        lat: poleLat, lng: poleLng,
-                        addr: poleAddr, colorCode: 7, isAbsent: false, memo: "데이터베이스 확인 완료"
+                        id: crypto.randomUUID(),
+                        title: "전주: " + found.meshno,
+                        lat: found.lat, lng: found.lng,
+                        addr: found.addr, colorCode: 7,
+                        isAbsent: false, memo: "GitHub 데이터 확인 완료"
                     };
-                    
                     currentSites.push(poleSite);
                     saveAndRender();
-                    
-                    var moveLoc = new kakao.maps.LatLng(poleLat, poleLng);
-                    map.setCenter(moveLoc);
-                    map.setLevel(2); // 로드뷰가 보일 수 있게 바짝 확대
+                    map.setCenter(new kakao.maps.LatLng(found.lat, found.lng));
+                    map.setLevel(2);
                     statusEl.innerText = "조회 성공!";
                 } else {
-                    alert("입력하신 번호 (" + poleNum + ")는 데이터베이스에 존재하지 않습니다.");
+                    alert("입력하신 번호 (" + poleNum + ")를 찾을 수 없습니다.");
                     statusEl.innerText = "조회 실패";
                 }
             } catch (error) {
-                console.error("DB 연동 에러:", error);
-                alert("서버 연결에 실패했습니다. API URL과 Key를 확인하거나, RLS 설정이 해제되어 있는지 확인해주세요.");
-                statusEl.innerText = "서버 오류";
+                console.error("조회 에러:", error);
+                alert("데이터 조회에 실패했습니다. 네트워크 상태를 확인해주세요.");
+                statusEl.innerText = "오류 발생";
             }
         }
 
@@ -213,8 +225,12 @@
                 if (status === kakao.maps.services.Status.OK) {
                     addrStr = !!result[0].road_address ? result[0].road_address.address_name : result[0].address.address_name;
                 }
-                var newSite = { id: Date.now(), title: title, lat: latLng.getLat(), lng: latLng.getLng(), addr: addrStr, colorCode: 2, isAbsent: false, memo: memo || "" };
-                currentSites.push(newSite); saveAndRender();
+                currentSites.push({
+                    id: crypto.randomUUID(), title: title,
+                    lat: latLng.getLat(), lng: latLng.getLng(),
+                    addr: addrStr, colorCode: 2, isAbsent: false, memo: memo || ""
+                });
+                saveAndRender();
             });
         }
 
@@ -226,29 +242,31 @@
                 var data = new Uint8Array(e.target.result);
                 var workbook = XLSX.read(data, {type: 'array'});
                 var json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], {header: 1});
-                var successData = []; var count = 0; var total = json.length - 1;
-                for(var i=1; i<json.length; i++) {
-                    (function(row, idx) {
-                        setTimeout(function() {
-                            var title = row[0] || '이름없음'; var addr = row[1]; var colorType = row[2] || 1;
-                            if(addr) {
-                                geocoder.addressSearch(addr, function(res, stat) {
-                                    if(stat === kakao.maps.services.Status.OK) {
-                                        successData.push({ id: Date.now() + idx + Math.random(), title: title, lat: parseFloat(res[0].y), lng: parseFloat(res[0].x), addr: addr, colorCode: colorType, isAbsent: false, memo: "" });
-                                    }
-                                    count++; document.getElementById('status').innerText = `변환 중... (${count}/${total})`;
-                                    if(count === total) { currentSites = successData; saveAndRender(); toggleMenu(); }
+                var rows = json.slice(1).filter(function(row) { return row[1]; });
+                var total = rows.length;
+                if(total === 0) { alert("주소 데이터가 없습니다."); return; }
+                var successData = []; var count = 0;
+
+                rows.forEach(function(row, idx) {
+                    setTimeout(function() {
+                        geocoder.addressSearch(row[1], function(res, stat) {
+                            if(stat === kakao.maps.services.Status.OK) {
+                                successData.push({
+                                    id: crypto.randomUUID(), title: row[0] || '이름없음',
+                                    lat: parseFloat(res[0].y), lng: parseFloat(res[0].x),
+                                    addr: row[1], colorCode: row[2] || 1, isAbsent: false, memo: ""
                                 });
-                            } else { count++; if(count === total) { currentSites = successData; saveAndRender(); toggleMenu(); } }
-                        }, idx * 50);
-                    })(json[i], i);
-                }
+                            }
+                            count++;
+                            document.getElementById('status').innerText = `변환 중... (${count}/${total})`;
+                            if(count === total) { currentSites = successData; saveAndRender(); toggleMenu(); }
+                        });
+                    }, idx * 50);
+                });
             };
             reader.readAsArrayBuffer(file);
         };
 
-        // 위치 추적 로직 (핸들러 생략됨 - 기본 기능 유지)
-        var isAbsoluteOrientation = false;
         function handleOrientation(event) {
             var heading = null;
             if (event.webkitCompassHeading !== undefined) heading = event.webkitCompassHeading;
@@ -260,24 +278,26 @@
         document.getElementById('track-btn').onclick = function() {
             if(watchId) {
                 navigator.geolocation.clearWatch(watchId); watchId = null;
-                window.removeEventListener('deviceorientationabsolute', handleOrientation, true); window.removeEventListener('deviceorientation', handleOrientation, true);
-                isAbsoluteOrientation = false; 
+                window.removeEventListener('deviceorientationabsolute', handleOrientation, true);
+                window.removeEventListener('deviceorientation', handleOrientation, true);
+                isAbsoluteOrientation = false;
                 if(myLocMarker) myLocMarker.setMap(null); myLocMarker = null;
                 this.innerText = "📡 위치 표기 시작"; this.style.background = "#f0f7ff"; this.style.color = "#0055AA";
             } else {
                 if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
                     DeviceOrientationEvent.requestPermission().then(res => { if (res === 'granted') window.addEventListener('deviceorientation', handleOrientation, true); });
-                } else { 
-                    window.addEventListener('deviceorientationabsolute', handleOrientation, true); window.addEventListener('deviceorientation', handleOrientation, true); 
+                } else {
+                    window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+                    window.addEventListener('deviceorientation', handleOrientation, true);
                 }
-                
                 if(navigator.geolocation) {
                     watchId = navigator.geolocation.watchPosition(function(pos) {
                         var moveLoc = new kakao.maps.LatLng(pos.coords.latitude, pos.coords.longitude);
                         if(!myLocMarker) {
-                            var content = document.createElement('div'); content.className = 'my-location-marker'; content.innerHTML = '<div id="direction-arrow" class="direction-arrow"></div><div class="location-dot"></div>';
+                            var content = document.createElement('div'); content.className = 'my-location-marker';
+                            content.innerHTML = '<div id="direction-arrow" class="direction-arrow"></div><div class="location-dot"></div>';
                             myLocMarker = new kakao.maps.CustomOverlay({ position: moveLoc, content: content, xAnchor: 0.5, yAnchor: 0.5 });
-                            myLocMarker.setMap(map); map.setCenter(moveLoc); 
+                            myLocMarker.setMap(map); map.setCenter(moveLoc);
                         } else { myLocMarker.setPosition(moveLoc); }
                     }, null, { enableHighAccuracy: true });
                     this.innerText = "🛑 표기 중단"; this.style.background = "#333"; this.style.color = "#fff";
@@ -300,9 +320,16 @@
                 var markerImg = new kakao.maps.MarkerImage(imageSrc, new kakao.maps.Size(30, 40));
                 var m = new kakao.maps.Marker({ position: new kakao.maps.LatLng(first.lat, first.lng), image: markerImg });
                 
-                var container = document.createElement('div'); container.className = 'iw-container'; container.style.padding = '15px'; container.style.backgroundColor = '#ffffff'; container.style.borderRadius = '12px'; container.style.width = '240px'; container.style.boxShadow = '0 4px 15px rgba(0,0,0,0.15)';
+                var container = document.createElement('div'); container.className = 'iw-container';
+                container.style.padding = '15px'; container.style.backgroundColor = '#ffffff';
+                container.style.borderRadius = '12px'; container.style.width = '240px';
+                container.style.boxShadow = '0 4px 15px rgba(0,0,0,0.15)';
+
                 var headerText = group.length > 1 ? `<b>${first.title}</b> 외 ${group.length - 1}건` : `<b>${first.title}</b>`;
-                var header = document.createElement('div'); header.style.borderBottom = `2px solid ${mColor}`; header.style.paddingBottom = '8px'; header.style.marginBottom = '5px'; header.style.color = mColor; header.style.fontSize = '14px'; header.innerHTML = headerText;
+                var header = document.createElement('div');
+                header.style.borderBottom = `2px solid ${mColor}`; header.style.paddingBottom = '8px';
+                header.style.marginBottom = '5px'; header.style.color = mColor; header.style.fontSize = '14px';
+                header.innerHTML = headerText;
                 container.appendChild(header);
 
                 var listArea = document.createElement('div'); listArea.style.maxHeight = '250px'; listArea.style.overflowY = 'auto';
@@ -314,13 +341,17 @@
 
                     var absentRow = document.createElement('label'); absentRow.className = 'absent-row';
                     var checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = item.isAbsent || false;
-                    checkbox.onchange = function() { item.isAbsent = checkbox.checked; localStorage.setItem('kesco_map_data', JSON.stringify(currentSites)); };
+                    checkbox.onchange = function() {
+                        item.isAbsent = checkbox.checked;
+                        try { localStorage.setItem('kesco_map_data', JSON.stringify(currentSites)); } catch(e) { console.warn('저장 실패:', e); }
+                    };
                     absentRow.appendChild(checkbox); absentRow.appendChild(document.createTextNode(' 미점검 (부재)')); itemDiv.appendChild(absentRow);
 
                     var btnGroup = document.createElement('div'); btnGroup.className = 'btn-group';
-                    var navA = document.createElement('a'); navA.className = 'nav-btn'; navA.href = `https://map.kakao.com/link/to/${item.title},${item.lat},${item.lng}`; navA.target = "_blank"; navA.innerText = "🚗 길찾기";
-                    var rvA = document.createElement('a'); rvA.className = 'rv-btn'; rvA.href = `https://map.kakao.com/link/roadview/${item.lat},${item.lng}`; rvA.target = "_blank"; rvA.innerText = "👁️ 로드뷰";
-                    
+                    var navA = document.createElement('a'); navA.className = 'nav-btn';
+                    navA.href = `https://map.kakao.com/link/to/${item.title},${item.lat},${item.lng}`; navA.target = "_blank"; navA.innerText = "🚗 길찾기";
+                    var rvA = document.createElement('a'); rvA.className = 'rv-btn';
+                    rvA.href = `https://map.kakao.com/link/roadview/${item.lat},${item.lng}`; rvA.target = "_blank"; rvA.innerText = "👁️ 로드뷰";
                     btnGroup.appendChild(navA); btnGroup.appendChild(rvA); itemDiv.appendChild(btnGroup);
 
                     var dBtn = document.createElement('button'); dBtn.className = 'del-btn'; dBtn.innerText = '점검완료 및 삭제';
@@ -341,8 +372,15 @@
             clusterer.addMarkers(markers);
         }
 
-        function saveAndRender() { localStorage.setItem('kesco_map_data', JSON.stringify(currentSites)); drawMarkers(); document.getElementById('status').innerText = currentSites.length + "건 관리 중"; }
-        document.getElementById('clear-btn').onclick = function() { if(confirm("모든 데이터를 삭제하시겠습니까?")) { localStorage.removeItem('kesco_map_data'); location.reload(); } };
+        function saveAndRender() {
+            try { localStorage.setItem('kesco_map_data', JSON.stringify(currentSites)); } catch(e) { console.warn('저장 실패:', e); }
+            drawMarkers();
+            document.getElementById('status').innerText = currentSites.length + "건 관리 중";
+        }
+
+        document.getElementById('clear-btn').onclick = function() {
+            if(confirm("모든 데이터를 삭제하시겠습니까?")) { localStorage.removeItem('kesco_map_data'); location.reload(); }
+        };
     </script>
 </body>
 </html>
