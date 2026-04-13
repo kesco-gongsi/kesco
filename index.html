@@ -40,8 +40,6 @@
         #pole-search-btn { background: #EAB308; color: #fff; margin-top: 5px; }
         #cluster-btn { background: #f0f7ff; color: #0055AA; border: 1px solid #0055AA; }
         #cluster-btn.off { background: #fff0f0; color: #b91c1c; border: 1px solid #b91c1c; }
-        /* #route-btn { background: #f0fff4; color: #15803d; border: 1px solid #15803d; } */
-        /* #route-btn.active-route { background: #15803d; color: white; } */
         #clear-btn { background: #ffffff; color: #666; border: 1px solid #ddd; margin-top: 10px; }
         #status { margin-top: 10px; font-size: 12px; color: #666; text-align: center; font-weight: bold; }
 
@@ -49,12 +47,15 @@
         .input-group input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 12px; text-transform: uppercase; }
 
         .filter-section { margin-bottom: 12px; }
-        .filter-section-title { font-size: 12px; font-weight: bold; color: #555; margin-bottom: 6px; }
+        .filter-section-title { font-size: 12px; font-weight: bold; color: #555; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; }
         .filter-chips { display: flex; flex-wrap: wrap; gap: 5px; }
         .filter-chip { padding: 4px 10px; border-radius: 99px; font-size: 11px; font-weight: bold; cursor: pointer; border: 2px solid transparent; transition: 0.15s; opacity: 0.4; }
         .filter-chip.on { opacity: 1; border-color: rgba(0,0,0,0.25); }
         .filter-chip-absent { padding: 4px 10px; border-radius: 99px; font-size: 11px; font-weight: bold; cursor: pointer; border: 2px solid #ddd; transition: 0.15s; background: white; color: #ef4444; }
         .filter-chip-absent.on { background: #fecaca; border-color: #ef4444; }
+        
+        .filter-chip-type { flex: 1; text-align: center; padding: 6px 4px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; border: 1px solid #ddd; transition: 0.15s; background: white; color: #0055AA; word-break: keep-all; }
+        .filter-chip-type.on { background: #e0f2fe; border-color: #0055AA; }
 
         .iw-container { background-color: #ffffff !important; color: #333333 !important; }
         .iw-item { border-bottom: 1px solid #eee; padding: 12px 0; }
@@ -70,21 +71,17 @@
         .rv-btn { flex: 1; display: block; background: #22C55E; color: white; text-align: center; padding: 8px; border-radius: 6px; text-decoration: none; font-size: 12px; font-weight: bold; }
         .del-btn { display: block; margin-top: 5px; background: #fecaca; color: #b91c1c; text-align: center; padding: 8px; border-radius: 6px; font-size: 11px; font-weight: bold; border: none; width: 100%; cursor: pointer; }
 
-        /* 동선 순번 오버레이 - 나중을 위해 주석 처리
-        .route-label { 
-            position: absolute; top: -10px; left: -10px; width: 22px; height: 22px; 
-            background: #15803d; color: white; border-radius: 50%; 
-            font-size: 11px; font-weight: bold; display: flex; align-items: center; justify-content: center; 
-            border: 2px solid white; box-shadow: 0 1px 4px rgba(0,0,0,0.3); 
-            pointer-events: none;
-        }
-        */
-
         .my-location-marker { position: relative; width: 50px; height: 50px; pointer-events: none; }
         .direction-arrow { position: absolute; top: 0px; left: 15px; width: 20px; height: 25px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23EF4444'%3E%3Cpath d='M12 2L22 20L12 17L2 20L12 2Z'/%3E%3C/svg%3E"); background-size: contain; background-repeat: no-repeat; background-position: center; transform-origin: center bottom; z-index: 2; transition: transform 0.1s ease-out; }
         .location-dot { position: absolute; top: 15px; left: 15px; width: 20px; height: 20px; background: #0055AA; border: 3px solid white; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.3); z-index: 3; }
 
         .section-divider { border: 0; border-top: 1px solid #eee; margin: 15px 0; }
+        
+        /* 실패 리스트 영역 */
+        #failed-section { display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee; }
+        #failed-list-content { display: none; max-height: 200px; overflow-y: auto; font-size: 11px; background: #fff; border: 1px solid #ddd; padding: 8px; border-radius: 6px; margin-top: 5px; }
+        .failed-item { border-bottom: 1px solid #f0f0f0; padding: 6px 0; }
+        .failed-item:last-child { border-bottom: none; }
     </style>
 </head>
 <body>
@@ -97,9 +94,10 @@
             <button id="btn-district" class="m-type-btn inactive" onclick="toggleDistrict()">지적편집도</button>
         </div>
 
-        <h3>📊 점검 지도 ver.10</h3>
+        <h3>📊 점검 지도 ver.12 (카카오)</h3>
         <div id="menu-content">
-            <div style="font-size:13px;font-weight:bold;margin-bottom:5px;color:#333;">⚡ 인입주(전주) 검색</div>
+
+            <div style="font-size:13px;font-weight:bold;margin-bottom:5px;color:#333;">⚡ 인입주 단일 검색</div>
             <div class="input-group">
                 <input type="text" id="pole-input" placeholder="인입주번호 8자리 입력" maxlength="8">
             </div>
@@ -108,10 +106,26 @@
             <hr class="section-divider">
 
             <div style="font-size:13px;font-weight:bold;margin-bottom:8px;color:#333;">🔽 마커 필터링</div>
+            
             <div class="filter-section">
-                <div class="filter-section-title">색상 코드</div>
+                <div class="filter-section-title">
+                    <span>조회 방식 (아이콘 구분)</span>
+                </div>
+                <div class="filter-chips" style="display:flex; gap:4px;">
+                    <div class="filter-chip-type on" id="filter-type-mixed" onclick="toggleSearchTypeFilter('mixed')">주소 우선<br><span style="font-size:9px;font-weight:normal;">(실패시 인입주)</span></div>
+                    <div class="filter-chip-type" id="filter-type-address" onclick="toggleSearchTypeFilter('address')">💧<br>주소만 보기</div>
+                    <div class="filter-chip-type" id="filter-type-pole" onclick="toggleSearchTypeFilter('pole')">💎<br>인입주만 보기</div>
+                </div>
+            </div>
+
+            <div class="filter-section">
+                <div class="filter-section-title">
+                    <span>색상 코드</span>
+                    <span style="color:#0055AA; cursor:pointer;" onclick="toggleAllColors()">🔄 전체선택/해제</span>
+                </div>
                 <div class="filter-chips" id="color-filter-chips"></div>
             </div>
+
             <div class="filter-section">
                 <div class="filter-section-title">부재 여부</div>
                 <div class="filter-chips">
@@ -124,12 +138,21 @@
             <hr class="section-divider">
 
             <input type="file" id="excel-file" accept=".xlsx,.xls" style="font-size:12px;margin-bottom:15px;width:100%;">
+            <div style="font-size:10px; color:#666; margin-top:-10px; margin-bottom:10px;">(형식: A열 상호, B열 주소, C열 색상, <b style="color:#0055AA;">D열 인입주번호</b>)</div>
+            
             <button id="upload-btn" class="btn">📍 엑셀 데이터 표출</button>
             <button id="track-btn" class="btn">📡 위치 표기 시작</button>
             <button id="cluster-btn" class="btn">🔵 클러스터링 ON</button>
-            
             <button id="clear-btn" class="btn">🔄 전체 초기화</button>
             <div id="status">지도를 길게 눌러 핀 추가</div>
+            
+            <div id="failed-section">
+                <button class="btn" style="background:#fee2e2; color:#b91c1c; border:1px solid #ef4444; margin-bottom:0;" onclick="toggleFailedList()">
+                    ❌ 데이터 누락/실패: <span id="fail-count">0</span>건 확인
+                </button>
+                <div id="failed-list-content"></div>
+            </div>
+
         </div>
     </div>
     <div id="map"></div>
@@ -141,19 +164,21 @@
 
         var map, clusterer, geocoder;
         var watchId = null;
-        var currentSites = [];
+        
+        // 데이터 구조: { id, title, addrText, colorCode, poleNum, addrLatLng: {lat,lng,addrStr}, poleLatLng: {lat,lng,addrStr}, isAbsent, memo }
+        var currentSites = []; 
+        var failedList = []; 
         var currentInfoWindow = null;
         var myLocMarker = null;
         var isDistrictOn = false;
         var isAbsoluteOrientation = false;
         var isClusteringOn = true;
-        
-        // var isRouteOn = false;
         var standaloneMarkers = [];
-        // var routeOverlays = [];
 
+        // 필터 상태
         var activeColorFilters = new Set([1,2,3,4,5,6,7,8,9,10]);
-        var absentFilter = 'all'; 
+        var absentFilter = 'all';
+        var searchTypeFilter = 'mixed'; // 'mixed' | 'address' | 'pole'
 
         var colorMap = { 1:"#0055AA", 2:"#EF4444", 3:"#22C55E", 4:"#F97316", 5:"#A855F7", 6:"#EC4899", 7:"#EAB308", 8:"#06B6D4", 9:"#78350F", 10:"#1F2937" };
 
@@ -167,6 +192,7 @@
                     chip.style.background = colorMap[code];
                     chip.style.color = 'white';
                     chip.textContent = code;
+                    chip.dataset.code = code;
                     chip.onclick = function() { toggleColorFilter(code, chip); };
                     wrap.appendChild(chip);
                 })(c);
@@ -179,6 +205,17 @@
             drawMarkers();
         }
 
+        function toggleAllColors() {
+            if (activeColorFilters.size === 10) {
+                activeColorFilters.clear();
+                document.querySelectorAll('#color-filter-chips .filter-chip').forEach(el => el.classList.remove('on'));
+            } else {
+                for(var i=1; i<=10; i++) activeColorFilters.add(i);
+                document.querySelectorAll('#color-filter-chips .filter-chip').forEach(el => el.classList.add('on'));
+            }
+            drawMarkers();
+        }
+
         function toggleAbsentFilter(val) {
             absentFilter = val;
             ['all','yes','no'].forEach(function(v) {
@@ -188,12 +225,38 @@
             drawMarkers();
         }
 
+        function toggleSearchTypeFilter(val) {
+            searchTypeFilter = val;
+            ['mixed','address','pole'].forEach(function(v) {
+                var el = document.getElementById('filter-type-' + v);
+                if (v === val) el.classList.add('on'); else el.classList.remove('on');
+            });
+            drawMarkers();
+        }
+
         function getFilteredSites() {
-            return currentSites.filter(function(s) {
+            var results = [];
+            currentSites.forEach(function(s) {
                 var colorOk = activeColorFilters.has(s.colorCode || 1);
                 var absentOk = absentFilter === 'all' || (absentFilter === 'yes' && s.isAbsent) || (absentFilter === 'no' && !s.isAbsent);
-                return colorOk && absentOk;
+                if (!colorOk || !absentOk) return;
+
+                var activeData = null;
+                
+                if (searchTypeFilter === 'mixed') {
+                    if (s.addrLatLng) activeData = { ...s, lat: s.addrLatLng.lat, lng: s.addrLatLng.lng, addr: s.addrLatLng.addrStr, viewMode: 'address' };
+                    else if (s.poleLatLng) activeData = { ...s, lat: s.poleLatLng.lat, lng: s.poleLatLng.lng, addr: s.poleLatLng.addrStr, viewMode: 'pole' };
+                } 
+                else if (searchTypeFilter === 'address') {
+                    if (s.addrLatLng) activeData = { ...s, lat: s.addrLatLng.lat, lng: s.addrLatLng.lng, addr: s.addrLatLng.addrStr, viewMode: 'address' };
+                } 
+                else if (searchTypeFilter === 'pole') {
+                    if (s.poleLatLng) activeData = { ...s, lat: s.poleLatLng.lat, lng: s.poleLatLng.lng, addr: s.poleLatLng.addrStr, viewMode: 'pole' };
+                }
+
+                if (activeData) results.push(activeData);
             });
+            return results;
         }
 
         function toggleMenu() {
@@ -201,6 +264,41 @@
             var btn = document.getElementById('toggle-btn');
             box.classList.toggle('collapsed');
             btn.innerText = box.classList.contains('collapsed') ? '메뉴 펴기' : '접기 ▲';
+        }
+
+        function toggleFailedList() {
+            var contentDiv = document.getElementById('failed-list-content');
+            contentDiv.style.display = contentDiv.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function renderFailedListUI() {
+            var section = document.getElementById('failed-section');
+            var countSpan = document.getElementById('fail-count');
+            var contentDiv = document.getElementById('failed-list-content');
+
+            var fails = [];
+            currentSites.forEach(s => {
+                if (!s.addrLatLng && !s.poleLatLng) {
+                    fails.push({ ...s, reason: "주소/인입주 모두 인식 불가" });
+                } 
+                else if (!s.addrLatLng && s.poleLatLng) {
+                    fails.push({ ...s, reason: "주소 미흡 (인입주 위치로 자동 대체됨)" });
+                }
+            });
+
+            if (fails.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+            section.style.display = 'block';
+            countSpan.innerText = fails.length;
+            contentDiv.innerHTML = fails.map(f =>
+                `<div class="failed-item">
+                    <b>${f.title}</b> <span style="color:#b91c1c; font-weight:bold;">[${f.reason}]</span><br>
+                    <span style="color:#666;">입력주소: ${f.addrText || '없음'}</span><br>
+                    <span style="color:#0055AA;">입력인입주: ${f.poleNum || '없음'}</span>
+                </div>`
+            ).join('');
         }
 
         function setMapType(type) {
@@ -233,8 +331,18 @@
             kakao.maps.event.addListener(map, 'rightclick', function(mouseEvent) { addManualMarker(mouseEvent.latLng); });
             kakao.maps.event.addListener(map, 'click', function() { if (currentInfoWindow) { currentInfoWindow.close(); currentInfoWindow = null; } });
             buildColorChips();
+            
             var saved = localStorage.getItem('kesco_map_data');
-            if (saved) { currentSites = JSON.parse(saved); drawMarkers(); }
+            if (saved) {
+                var parsed = JSON.parse(saved);
+                if (parsed.length > 0 && parsed[0].addrLatLng === undefined && parsed[0].lat !== undefined) {
+                    localStorage.removeItem('kesco_map_data');
+                    currentSites = [];
+                } else {
+                    currentSites = parsed; 
+                }
+                drawMarkers(); 
+            }
         });
 
         document.getElementById('cluster-btn').onclick = function() {
@@ -244,74 +352,19 @@
             drawMarkers();
         };
 
-        /* 최적 동선 관련 로직 주석 처리
-        document.getElementById('route-btn').onclick = function() {
-            isRouteOn = !isRouteOn;
-            this.innerText = isRouteOn ? '🛑 동선 표시 끄기' : '🗺️ 최적 동선 보기';
-            this.classList.toggle('active-route', isRouteOn);
-            drawMarkers();
-        };
-
         function getDistance(lat1, lon1, lat2, lon2) {
             const R = 6371;
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
             const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
         }
-
-        function calcOptimalRoute(startLat, startLng, sites) {
-            var remaining = sites.slice();
-            var ordered = [];
-            var curLat = startLat, curLng = startLng;
-            while (remaining.length > 0) {
-                var minDist = Infinity, minIdx = 0;
-                remaining.forEach(function(s, i) {
-                    var d = getDistance(curLat, curLng, s.lat, s.lng);
-                    if (d < minDist) { minDist = d; minIdx = i; }
-                });
-                ordered.push(remaining[minIdx]);
-                curLat = remaining[minIdx].lat; curLng = remaining[minIdx].lng;
-                remaining.splice(minIdx, 1);
-            }
-            return ordered;
-        }
-
-        function clearRouteOverlays() {
-            routeOverlays.forEach(function(o) { o.setMap(null); });
-            routeOverlays = [];
-        }
-
-        function drawRouteOverlays(orderedSites) {
-            clearRouteOverlays();
-            orderedSites.forEach(function(s, i) {
-                var content = document.createElement('div');
-                content.style.position = 'relative';
-                content.innerHTML = '<div class="route-label">' + (i+1) + '</div>';
-                var overlay = new kakao.maps.CustomOverlay({
-                    position: new kakao.maps.LatLng(s.lat, s.lng),
-                    content: content, xAnchor: 0.5, yAnchor: 2.5,
-                    zIndex: 2
-                });
-                overlay.setMap(map);
-                routeOverlays.push(overlay);
-            });
-            var path = orderedSites.map(function(s) { return new kakao.maps.LatLng(s.lat, s.lng); });
-            if (myLocMarker) path.unshift(myLocMarker.getPosition());
-            var polyline = new kakao.maps.Polyline({
-                path: path, strokeWeight: 2, strokeColor: '#15803d', strokeOpacity: 0.6, strokeStyle: 'dashed', zIndex: 1 
-            });
-            polyline.setMap(map);
-            routeOverlays.push(polyline);
-        }
-        */
 
         async function searchPole() {
             var poleNum = document.getElementById('pole-input').value.toUpperCase().trim();
             if (poleNum.length !== 8) { alert("인입주번호 8자리를 입력해주세요. (예: 1234A567)"); return; }
             var statusEl = document.getElementById('status');
             statusEl.innerText = "검색 중...";
-            var fileKey = poleNum.substring(0, 4);
+            var fileKey = poleNum.substring(0,4);
             var url = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${fileKey}.csv?t=${new Date().getTime()}`;
             try {
                 const response = await fetch(url);
@@ -323,42 +376,51 @@
                     var cols = lines[i].split(',');
                     if (cols[0] && cols[0].trim().toUpperCase() === poleNum) {
                         var lngVal = parseFloat(cols[2]), latVal = parseFloat(cols[3]);
-                        if (!isNaN(latVal) && !isNaN(lngVal)) foundList.push({ meshno: cols[0].trim(), addr: cols[1]?cols[1].trim():"주소 정보 없음", lng: lngVal, lat: latVal });
+                        if (!isNaN(latVal) && !isNaN(lngVal)) foundList.push({ meshno:cols[0].trim(), addr:cols[1]?cols[1].trim():"주소 정보 없음", lng:lngVal, lat:latVal });
                     }
                 }
                 if (foundList.length > 0) {
                     var refPoint = null;
                     if (myLocMarker) refPoint = { lat: myLocMarker.getPosition().getLat(), lng: myLocMarker.getPosition().getLng() };
-                    else if (currentSites.length > 0) { var ls = currentSites[currentSites.length-1]; refPoint = { lat: ls.lat, lng: ls.lng }; }
+                    else {
+                        var valids = currentSites.filter(s => s.addrLatLng || s.poleLatLng);
+                        if(valids.length > 0) {
+                            var target = valids[valids.length-1];
+                            refPoint = target.addrLatLng ? target.addrLatLng : target.poleLatLng;
+                        }
+                    }
                     if (refPoint) {
-                        // 거리 계산 함수가 주석 처리되었으므로 단순하게 리스트의 첫 번째 항목을 사용하거나 거리 계산 로직만 별도로 유지
-                        // (검색 필터링을 위한 간단한 자체 거리 계산식 삽입)
-                        var getDistLocal = function(lat1, lon1, lat2, lon2) {
-                            var dLat = (lat2 - lat1) * Math.PI / 180;
-                            var dLon = (lon2 - lon1) * Math.PI / 180;
-                            var a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)*Math.sin(dLon/2);
-                            return 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                        };
-                        foundList.sort(function(a,b){ return getDistLocal(refPoint.lat,refPoint.lng,a.lat,a.lng) - getDistLocal(refPoint.lat,refPoint.lng,b.lat,b.lng); });
+                        foundList.sort(function(a,b){ return getDistance(refPoint.lat,refPoint.lng,a.lat,a.lng)-getDistance(refPoint.lat,refPoint.lng,b.lat,b.lng); });
                         foundList = [foundList[0]];
                     }
                     foundList.forEach(function(found) {
-                        currentSites.push({ id: crypto.randomUUID(), title:"전주: "+found.meshno, lat:found.lat, lng:found.lng, addr:found.addr, colorCode:7, isAbsent:false, memo:"GitHub 데이터 확인 완료" });
+                        currentSites.push({ 
+                            id: crypto.randomUUID(), title: "전주: " + found.meshno, addrText: found.addr, colorCode: 7, poleNum: found.meshno,
+                            addrLatLng: null, poleLatLng: { lat: found.lat, lng: found.lng, addrStr: found.addr },
+                            isAbsent: false, memo: "인입주 단일 검색 추가"
+                        });
                     });
+                    
+                    toggleSearchTypeFilter('mixed'); 
                     saveAndRender();
                     map.setCenter(new kakao.maps.LatLng(foundList[0].lat, foundList[0].lng));
                     map.setLevel(2);
-                } else { alert("해당 번호를 찾을 수 없습니다."); statusEl.innerText = "조회 실패"; }
-            } catch (error) { alert("조회 에러가 발생했습니다."); statusEl.innerText = "오류 발생"; }
+                    statusEl.innerText = refPoint ? "현재 위치 기반 최단거리 조회 성공!" : "전국 중복 데이터 " + foundList.length + "건 모두 표시";
+                } else { alert("입력하신 번호 (" + poleNum + ")를 찾을 수 없습니다."); statusEl.innerText = "조회 실패"; }
+            } catch (error) { alert(`조회 에러: ${error.message}`); statusEl.innerText = "오류 발생"; }
         }
 
         function addManualMarker(latLng) {
-            var title = prompt("📍 상호를 입력하세요:", "");
+            var title = prompt("📍 새로운 장소의 상호를 입력하세요:", "");
             if (!title) return;
-            var memo = prompt("📝 메모:", "");
+            var memo = prompt("📝 메모를 입력하세요 (없으면 확인):", "");
             geocoder.coord2Address(latLng.getLng(), latLng.getLat(), function(result, status) {
                 var addrStr = status === kakao.maps.services.Status.OK ? (result[0].road_address ? result[0].road_address.address_name : result[0].address.address_name) : "수동 등록 지점";
-                currentSites.push({ id: crypto.randomUUID(), title, lat: latLng.getLat(), lng: latLng.getLng(), addr: addrStr, colorCode: 2, isAbsent: false, memo: memo || "" });
+                currentSites.push({ 
+                    id: crypto.randomUUID(), title: title, addrText: addrStr, colorCode: 2, poleNum: "",
+                    addrLatLng: { lat: latLng.getLat(), lng: latLng.getLng(), addrStr: addrStr }, poleLatLng: null,
+                    isAbsent: false, memo: memo||""
+                });
                 saveAndRender();
             });
         }
@@ -367,24 +429,125 @@
             var file = document.getElementById('excel-file').files[0];
             if (!file) return alert("파일을 선택해주세요.");
             var reader = new FileReader();
-            reader.onload = function(e) {
+            
+            reader.onload = async function(e) {
                 var data = new Uint8Array(e.target.result);
                 var workbook = XLSX.read(data, { type: 'array' });
                 var json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
-                var rows = json.slice(1).filter(function(row) { return row[1]; });
+                
+                var rows = json.slice(1).filter(row => row[0] || row[1] || row[3]); 
                 var total = rows.length;
-                var successData = []; var count = 0;
-                rows.forEach(function(row, idx) {
-                    setTimeout(function() {
-                        geocoder.addressSearch(row[1], function(res, stat) {
-                            if (stat === kakao.maps.services.Status.OK)
-                                successData.push({ id: crypto.randomUUID(), title: row[0]||'이름없음', lat: parseFloat(res[0].y), lng: parseFloat(res[0].x), addr: row[1], colorCode: row[2]||1, isAbsent: false, memo: "" });
-                            count++;
-                            document.getElementById('status').innerText = `변환 중... (${count}/${total})`;
-                            if (count === total) { currentSites = successData; saveAndRender(); toggleMenu(); }
-                        });
-                    }, idx * 50);
+                if (total === 0) { alert("유효한 데이터가 없습니다."); return; }
+                
+                document.getElementById('status').innerText = `주소 변환 시작...`;
+                
+                var newSites = [];
+                for (let i = 0; i < rows.length; i++) {
+                    newSites.push({
+                        id: crypto.randomUUID(),
+                        title: rows[i][0] ? rows[i][0].toString() : '이름없음',
+                        addrText: rows[i][1] ? rows[i][1].toString().trim() : '',
+                        colorCode: rows[i][2] || 1,
+                        poleNum: rows[i][3] ? rows[i][3].toString().toUpperCase().trim() : '',
+                        addrLatLng: null,
+                        poleLatLng: null,
+                        isAbsent: false,
+                        memo: ""
+                    });
+                }
+
+                // 1. 카카오 지오코딩 검증 (본번, 건물번호 확인)
+                var geocodePromises = newSites.map((site, idx) => {
+                    return new Promise((resolve) => {
+                        if (!site.addrText) return resolve();
+                        setTimeout(() => {
+                            geocoder.addressSearch(site.addrText, function(result, status) {
+                                if (status === kakao.maps.services.Status.OK && result.length > 0) {
+                                    var addrObj = result[0];
+                                    var isExact = false;
+                                    
+                                    // 카카오 주소 구조상 도로명에 건물본번이 있거나, 지번에 주소본번이 있어야 함
+                                    if (addrObj.road_address && addrObj.road_address.main_building_no) isExact = true;
+                                    if (addrObj.address && addrObj.address.main_address_no) isExact = true;
+
+                                    if (isExact) {
+                                        site.addrLatLng = { lat: parseFloat(addrObj.y), lng: parseFloat(addrObj.x), addrStr: site.addrText };
+                                    }
+                                }
+                                resolve();
+                            });
+                        }, idx * 40);
+                    });
                 });
+
+                await Promise.all(geocodePromises);
+                document.getElementById('status').innerText = `인입주 백업 정보 다운로드 중...`;
+
+                // 2. 인입주 정보 매칭
+                var polePrefixes = [...new Set(newSites.filter(s => s.poleNum && s.poleNum.length === 8).map(s => s.poleNum.substring(0,4)))];
+                var poleDict = {}; 
+
+                for (let i=0; i<polePrefixes.length; i++) {
+                    let prefix = polePrefixes[i];
+                    let url = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${prefix}.csv?t=${new Date().getTime()}`;
+                    try {
+                        let res = await fetch(url);
+                        if (res.ok) {
+                            let text = await res.text();
+                            let lines = text.trim().split('\n');
+                            for(let j=1; j<lines.length; j++) {
+                                let cols = lines[j].split(',');
+                                if (cols.length >= 4 && cols[0]) {
+                                    let pNum = cols[0].trim().toUpperCase();
+                                    let lngVal = parseFloat(cols[2]); let latVal = parseFloat(cols[3]);
+                                    if (!isNaN(latVal) && !isNaN(lngVal)) {
+                                        if(!poleDict[pNum]) poleDict[pNum] = [];
+                                        poleDict[pNum].push({ lat: latVal, lng: lngVal, addr: cols[1] ? cols[1].trim() : "NDIS 주소 없음" });
+                                    }
+                                }
+                            }
+                        }
+                    } catch(e) {}
+                }
+
+                // 기준점
+                var refPoint = null;
+                if (myLocMarker) refPoint = { lat: myLocMarker.getPosition().getLat(), lng: myLocMarker.getPosition().getLng() };
+                else {
+                    var validAddrs = newSites.filter(s => s.addrLatLng);
+                    if (validAddrs.length > 0) {
+                        var sumLat = 0, sumLng = 0;
+                        validAddrs.forEach(s => { sumLat += s.addrLatLng.lat; sumLng += s.addrLatLng.lng; });
+                        refPoint = { lat: sumLat/validAddrs.length, lng: sumLng/validAddrs.length };
+                    }
+                }
+
+                newSites.forEach(site => {
+                    if (site.poleNum && poleDict[site.poleNum] && poleDict[site.poleNum].length > 0) {
+                        var matches = poleDict[site.poleNum];
+                        if (refPoint) { 
+                            matches.sort((a,b) => getDistance(refPoint.lat, refPoint.lng, a.lat, a.lng) - getDistance(refPoint.lat, refPoint.lng, b.lat, b.lng));
+                        }
+                        site.poleLatLng = { lat: matches[0].lat, lng: matches[0].lng, addrStr: matches[0].addr };
+                    }
+                });
+
+                currentSites = newSites;
+                saveAndRender();
+                
+                // 💡 화면 자동 센터링 (FitBounds)
+                var activeMarkers = getFilteredSites();
+                if (activeMarkers.length > 0) {
+                    var bounds = new kakao.maps.LatLngBounds();
+                    activeMarkers.forEach(s => bounds.extend(new kakao.maps.LatLng(s.lat, s.lng)));
+                    
+                    // 약간의 딜레이를 주어 렌더링을 기다린 후 이동
+                    setTimeout(() => {
+                        map.setBounds(bounds, 40, 40, 40, 40);
+                    }, 200);
+                }
+
+                toggleMenu();
             };
             reader.readAsArrayBuffer(file);
         };
@@ -397,7 +560,7 @@
         document.getElementById('track-btn').onclick = function() {
             if (watchId) {
                 navigator.geolocation.clearWatch(watchId); watchId = null;
-                if (myLocMarker) myLocMarker.setMap(null); myLocMarker = null;
+                if (myLocMarker) { myLocMarker.setMap(null); myLocMarker = null; }
                 this.innerText = "📡 위치 표기 시작"; this.style.background = "#f0f7ff"; this.style.color = "#0055AA";
             } else {
                 if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function')
@@ -412,7 +575,6 @@
                             myLocMarker = new kakao.maps.CustomOverlay({ position: moveLoc, content, xAnchor: 0.5, yAnchor: 0.5, zIndex: 10 }); 
                             myLocMarker.setMap(map); map.setCenter(moveLoc);
                         } else { myLocMarker.setPosition(moveLoc); }
-                        // if (isRouteOn) drawMarkers(); // 동선 관련 주석 처리
                     }, null, { enableHighAccuracy: true });
                     this.innerText = "🛑 표기 중단"; this.style.background = "#333"; this.style.color = "#fff";
                 }
@@ -422,47 +584,93 @@
         function buildMarkerObjects(sites) {
             var groups = {};
             sites.forEach(function(s) {
+                if (s.lat==null||s.lng==null||isNaN(s.lat)||isNaN(s.lng)) return;
                 var key = Number(s.lat).toFixed(6) + "," + Number(s.lng).toFixed(6);
                 if (!groups[key]) groups[key] = []; groups[key].push(s);
             });
+            
             return Object.values(groups).map(function(group) {
                 var first = group[0];
                 var mColor = colorMap[first.colorCode] || "#0055AA";
-                var imageSrc = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg width="30" height="40" viewBox="0 0 30 40" xmlns="http://www.w3.org/2000/svg"><path d="M15 0C6.716 0 0 6.716 0 15c0 11.25 15 25 15 25s15-13.75 15-25c0-8.284-6.716-15-15-15z" fill="${mColor}"/><circle cx="15" cy="15" r="6" fill="white"/></svg>`)}`;
-                var m = new kakao.maps.Marker({ position: new kakao.maps.LatLng(first.lat, first.lng), image: new kakao.maps.MarkerImage(imageSrc, new kakao.maps.Size(30, 40)) });
+                var isPole = first.viewMode === 'pole';
+                
+                // 💎 인입주는 육각형 / 💧 일반 주소는 물방울 핀
+                var svgPath = isPole 
+                    ? `<path d="M8 0 L22 0 L30 15 L15 40 L0 15 L8 0 Z" fill="${mColor}"/><circle cx="15" cy="12" r="5" fill="white"/>` 
+                    : `<path d="M15 0C6.716 0 0 6.716 0 15c0 11.25 15 25 15 25s15-13.75 15-25c0-8.284-6.716-15-15-15z" fill="${mColor}"/><circle cx="15" cy="15" r="6" fill="white"/>`;
+
+                var imageSrc = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg width="30" height="40" viewBox="0 0 30 40" xmlns="http://www.w3.org/2000/svg">${svgPath}</svg>`)}`;
+                var markerImage = new kakao.maps.MarkerImage(imageSrc, new kakao.maps.Size(30, 40), {offset: new kakao.maps.Point(15, 40)});
+                var m = new kakao.maps.Marker({ position: new kakao.maps.LatLng(first.lat, first.lng), image: markerImage });
+
                 var container = document.createElement('div'); container.className = 'iw-container';
                 container.style.cssText = 'padding:15px;background:#fff;border-radius:12px;width:240px;box-shadow:0 4px 15px rgba(0,0,0,0.15);';
+                
+                var headerIcon = isPole ? '💎' : '💧';
+                var headerText = group.length > 1 ? `<b>${headerIcon} ${first.title}</b> 외 ${group.length-1}건` : `<b>${headerIcon} ${first.title}</b>`;
                 var header = document.createElement('div');
                 header.style.cssText = `border-bottom:2px solid ${mColor};padding-bottom:8px;margin-bottom:5px;color:${mColor};font-size:14px;`;
-                header.innerHTML = group.length > 1 ? `<b>${first.title}</b> 외 ${group.length-1}건` : `<b>${first.title}</b>`;
+                header.innerHTML = headerText;
                 container.appendChild(header);
+                
                 var listArea = document.createElement('div'); listArea.style.cssText = 'max-height:300px;overflow-y:auto;';
                 group.forEach(function(item) {
                     var itemDiv = document.createElement('div'); itemDiv.className = 'iw-item';
-                    itemDiv.innerHTML = `<div style="font-weight:bold;font-size:13px;color:#333;">${item.title}</div><div style="font-size:11px;color:#666;">${item.addr}</div>`;
-                    var memoDisplay = document.createElement('div'); memoDisplay.className = 'memo-text'; memoDisplay.innerText = item.memo ? "📝 " + item.memo : "📝 메모 추가";
+                    
+                    var poleDisplay = item.poleNum ? `<br><span style="color:#0055AA;">[인입주] ${item.poleNum}</span>` : '';
+                    itemDiv.innerHTML = `<div style="font-weight:bold;font-size:13px;color:#333;">${item.title}</div><div style="font-size:11px;color:#666;">${item.addr}${poleDisplay}</div>`;
+                    
+                    var memoWrap = document.createElement('div');
+                    var memoDisplay = document.createElement('div');
+                    memoDisplay.className = 'memo-text';
+                    memoDisplay.style.cursor = 'pointer';
+                    memoDisplay.title = '클릭하여 수정';
+                    memoDisplay.innerText = item.memo ? "📝 " + item.memo : "📝 메모 추가";
+                    if (!item.memo) memoDisplay.style.cssText += 'color:#aaa;background:#f9f9f9;border-left-color:#ccc;';
+
                     var memoEditor = document.createElement('div'); memoEditor.style.display = 'none';
                     var textarea = document.createElement('textarea'); textarea.className = 'memo-edit-area'; textarea.value = item.memo || '';
                     var saveBtn = document.createElement('button'); saveBtn.className = 'memo-save-btn'; saveBtn.innerText = '저장';
+                    
                     saveBtn.onclick = function() {
-                        item.memo = textarea.value.trim(); memoDisplay.innerText = item.memo ? "📝 " + item.memo : "📝 메모 추가";
+                        var realItem = currentSites.find(s => s.id === item.id);
+                        if(realItem) {
+                            realItem.memo = textarea.value.trim();
+                            memoDisplay.innerText = realItem.memo ? "📝 " + realItem.memo : "📝 메모 추가";
+                            if (!realItem.memo) { memoDisplay.style.color='#aaa'; memoDisplay.style.background='#f9f9f9'; memoDisplay.style.borderLeftColor='#ccc'; }
+                            else { memoDisplay.style.color='#059669'; memoDisplay.style.background='#ecfdf5'; memoDisplay.style.borderLeftColor='#10b981'; }
+                            saveAndRender(false);
+                        }
                         memoEditor.style.display = 'none'; memoDisplay.style.display = 'block';
-                        localStorage.setItem('kesco_map_data', JSON.stringify(currentSites));
                     };
                     memoDisplay.onclick = function() { memoDisplay.style.display='none'; memoEditor.style.display='block'; textarea.focus(); };
-                    memoEditor.append(textarea, saveBtn); itemDiv.append(memoDisplay, memoEditor);
+                    
+                    memoEditor.append(textarea, saveBtn); memoWrap.append(memoDisplay, memoEditor); itemDiv.append(memoWrap);
+                    
                     var absLabel = document.createElement('label'); absLabel.className = 'absent-row';
                     var chk = document.createElement('input'); chk.type = 'checkbox'; chk.checked = item.isAbsent;
-                    chk.onchange = function() { item.isAbsent = chk.checked; localStorage.setItem('kesco_map_data', JSON.stringify(currentSites)); };
+                    chk.onchange = function() { 
+                        var realItem = currentSites.find(s => s.id === item.id);
+                        if (realItem) { realItem.isAbsent = chk.checked; saveAndRender(false); }
+                    };
                     absLabel.append(chk, ' 미점검 (부재)'); itemDiv.append(absLabel);
+                    
                     var g = document.createElement('div'); g.className = 'btn-group';
                     var n = document.createElement('a'); n.className = 'nav-btn'; n.href = `https://map.kakao.com/link/to/${item.title},${item.lat},${item.lng}`; n.target = "_blank"; n.innerText = "🚗 길찾기";
                     var r = document.createElement('a'); r.className = 'rv-btn'; r.href = `https://map.kakao.com/link/roadview/${item.lat},${item.lng}`; r.target = "_blank"; r.innerText = "👁️ 로드뷰";
                     g.append(n, r); itemDiv.append(g);
+                    
                     var d = document.createElement('button'); d.className = 'del-btn'; d.innerText = '점검완료 및 삭제';
-                    d.onclick = function() { if (confirm('삭제하시겠습니까?')) { currentSites = currentSites.filter(s => s.id !== item.id); if (currentInfoWindow) currentInfoWindow.close(); saveAndRender(); } };
+                    d.onclick = function() { 
+                        if (confirm('삭제하시겠습니까?')) { 
+                            currentSites = currentSites.filter(s => s.id !== item.id); 
+                            if (currentInfoWindow) currentInfoWindow.close(); 
+                            saveAndRender(); 
+                        } 
+                    };
                     itemDiv.append(d); listArea.append(itemDiv);
                 });
+                
                 container.appendChild(listArea);
                 var iw = new kakao.maps.InfoWindow({ content: container, removable: true, zIndex: 99 });
                 kakao.maps.event.addListener(m, 'click', function() { if (currentInfoWindow) currentInfoWindow.close(); iw.open(map, m); currentInfoWindow = iw; });
@@ -472,28 +680,28 @@
 
         function drawMarkers() {
             clusterer.clear(); standaloneMarkers.forEach(m => m.setMap(null)); standaloneMarkers = []; 
-            // clearRouteOverlays(); // 동선 관련 주석 처리
+            if (currentInfoWindow) currentInfoWindow.close();
             
             var filtered = getFilteredSites(); var markers = buildMarkerObjects(filtered);
             if (isClusteringOn) clusterer.addMarkers(markers); else { markers.forEach(m => m.setMap(map)); standaloneMarkers = markers; }
             
-            /* 최적 동선 로직 주석 처리
-            if (isRouteOn && filtered.length > 0) {
-                var start = myLocMarker ? {lat: myLocMarker.getPosition().getLat(), lng: myLocMarker.getPosition().getLng()} : {lat: filtered[0].lat, lng: filtered[0].lng};
-                var unvisited = filtered.filter(s => !s.isAbsent); if (unvisited.length === 0) unvisited = filtered;
-                var ordered = calcOptimalRoute(start.lat, start.lng, unvisited); drawRouteOverlays(ordered);
-                var d = 0; var p = start; ordered.forEach(s => { d += getDistance(p.lat, p.lng, s.lat, s.lng); p = s; });
-                document.getElementById('status').innerText = `동선: ${ordered.length}건 / 총 ${d.toFixed(1)}km`;
-            } else {
-                document.getElementById('status').innerText = currentSites.length + "건 관리 중";
-            }
-            */
-            
-            // 동선 기능이 비활성화되었으므로 기본 상태 텍스트만 출력
-            document.getElementById('status').innerText = currentSites.length + "건 관리 중";
+            document.getElementById('status').innerText = currentSites.length + "건 원본 중 " + filtered.length + "건 표출";
+            renderFailedListUI();
         }
 
-        function saveAndRender() { localStorage.setItem('kesco_map_data', JSON.stringify(currentSites)); drawMarkers(); }
+        function saveAndRender(reDraw = true) { 
+            try { 
+                localStorage.setItem('kesco_map_data', JSON.stringify(currentSites)); 
+            } catch(e) {}
+            if (reDraw) drawMarkers(); 
+        }
+
+        document.getElementById('clear-btn').onclick = function() {
+            if (confirm("모든 데이터를 삭제하시겠습니까?")) { 
+                localStorage.removeItem('kesco_map_data'); 
+                location.reload(); 
+            }
+        };
     </script>
 </body>
 </html>
