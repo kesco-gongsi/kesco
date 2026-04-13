@@ -16,11 +16,13 @@
         #upload-box {
             position: absolute; top: 15px; left: 15px; z-index: 1001;
             background: rgba(255,255,255,0.95); color: #333;
-            padding: 20px; border-radius: 14px; width: 260px;
+            padding: 20px; padding-bottom: 25px; border-radius: 14px; width: 260px;
             box-shadow: 0 8px 30px rgba(0,0,0,0.15);
             transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
             border: 1px solid #e1e4e8;
+            box-sizing: border-box; /* 패딩을 전체 높이에 포함 */
             max-height: calc(100vh - 30px);
+            max-height: calc(100dvh - 30px); /* 모바일 동적 주소창 완벽 대응 */
             overflow-y: auto;
         }
         #upload-box.collapsed { width: 110px; padding: 0; height: 42px; border: none; background: transparent; box-shadow: none; overflow: hidden; }
