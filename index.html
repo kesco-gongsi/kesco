@@ -35,7 +35,9 @@
         .btn { width: 100%; padding: 12px; margin-bottom: 8px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 13px; }
         #upload-btn { background: #0055AA; color: white; }
         #track-btn { background: #f0f7ff; color: #0055AA; border: 1px solid #0055AA; }
-        #pole-search-btn { background: #EAB308; color: #fff; margin-top: 5px; } 
+        #pole-search-btn { background: #EAB308; color: #fff; margin-top: 5px; }
+        #cluster-btn { background: #f0f7ff; color: #0055AA; border: 1px solid #0055AA; }
+        #cluster-btn.off { background: #fff0f0; color: #b91c1c; border: 1px solid #b91c1c; }
         #clear-btn { background: #ffffff; color: #666; border: 1px solid #ddd; margin-top: 10px; }
         #status { margin-top: 10px; font-size: 12px; color: #666; text-align: center; font-weight: bold; }
 
@@ -69,7 +71,7 @@
             <button id="btn-district" class="m-type-btn inactive" onclick="toggleDistrict()">지적편집도</button>
         </div>
 
-        <h3>📊 점검 지도 ver.7</h3>
+        <h3>📊 점검 지도 ver.8</h3>
         <div id="menu-content">
             <div style="font-size: 13px; font-weight: bold; margin-bottom: 5px; color: #333;">⚡ 인입주(전주) 검색</div>
             <div class="input-group">
@@ -82,6 +84,7 @@
             <input type="file" id="excel-file" accept=".xlsx, .xls" style="font-size:12px; margin-bottom:15px; width: 100%;">
             <button id="upload-btn" class="btn">📍 엑셀 데이터 표출</button>
             <button id="track-btn" class="btn">📡 위치 표기 시작</button>
+            <button id="cluster-btn" class="btn">🔵 클러스터링 ON</button>
             <button id="clear-btn" class="btn">🔄 전체 초기화</button>
             <div id="status">지도를 길게 눌러 핀 추가</div>
         </div>
@@ -104,6 +107,8 @@
         var myLocMarker = null;
         var isDistrictOn = false;
         var isAbsoluteOrientation = false;
+        var isClusteringOn = true;
+        var standaloneMarkers = [];
 
         var colorMap = { 1: "#0055AA", 2: "#EF4444", 3: "#22C55E", 4: "#F97316", 5: "#A855F7", 6: "#EC4899", 7: "#EAB308", 8: "#06B6D4", 9: "#78350F", 10: "#1F2937" };
 
@@ -149,6 +154,19 @@
             if(saved) { currentSites = JSON.parse(saved); drawMarkers(); }
         });
 
+        // 클러스터링 토글 버튼
+        document.getElementById('cluster-btn').onclick = function() {
+            isClusteringOn = !isClusteringOn;
+            if (isClusteringOn) {
+                this.innerText = '🔵 클러스터링 ON';
+                this.classList.remove('off');
+            } else {
+                this.innerText = '⚪ 클러스터링 OFF';
+                this.classList.add('off');
+            }
+            drawMarkers();
+        };
+
         function getDistance(lat1, lon1, lat2, lon2) {
             const R = 6371; 
             const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -188,7 +206,6 @@
                 for (var i = 1; i < lines.length; i++) {
                     var cols = lines[i].split(',');
                     if (cols[0] && cols[0].trim().toUpperCase() === poleNum) {
-                        // 💡 [안전장치 추가] 좌표가 유효한지 확인하고 담기
                         var lngVal = parseFloat(cols[2]);
                         var latVal = parseFloat(cols[3]);
                         
@@ -344,19 +361,15 @@
             }
         };
 
-        function drawMarkers() {
-            clusterer.clear();
+        function buildMarkerObjects() {
             var groups = {};
             currentSites.forEach(function(s) {
-                // 💡 [안전장치 추가] 불량 데이터(좌표 없음)가 있으면 무시하고 패스해서 앱 뻗는 현상 방지
-                if (s.lat == null || s.lng == null || isNaN(s.lat) || isNaN(s.lng)) return; 
-
-                // 강제로 숫자로 변환 후 소수점 처리하여 에러 원천 차단
+                if (s.lat == null || s.lng == null || isNaN(s.lat) || isNaN(s.lng)) return;
                 var key = Number(s.lat).toFixed(6) + "," + Number(s.lng).toFixed(6);
                 if (!groups[key]) groups[key] = []; groups[key].push(s);
             });
 
-            var markers = Object.values(groups).map(function(group) {
+            return Object.values(groups).map(function(group) {
                 var first = group[0];
                 var mColor = colorMap[first.colorCode] || "#0055AA";
                 var imageSrc = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg width="30" height="40" viewBox="0 0 30 40" xmlns="http://www.w3.org/2000/svg"><path d="M15 0C6.716 0 0 6.716 0 15c0 11.25 15 25 15 25s15-13.75 15-25c0-8.284-6.716-15-15-15z" fill="${mColor}"/><circle cx="15" cy="15" r="6" fill="white"/></svg>`)}`;
@@ -412,7 +425,22 @@
                 kakao.maps.event.addListener(m, 'click', function() { if (currentInfoWindow) currentInfoWindow.close(); iw.open(map, m); currentInfoWindow = iw; });
                 return m;
             });
-            clusterer.addMarkers(markers);
+        }
+
+        function drawMarkers() {
+            // 기존 마커 모두 제거
+            clusterer.clear();
+            standaloneMarkers.forEach(function(m) { m.setMap(null); });
+            standaloneMarkers = [];
+
+            var markers = buildMarkerObjects();
+
+            if (isClusteringOn) {
+                clusterer.addMarkers(markers);
+            } else {
+                markers.forEach(function(m) { m.setMap(map); });
+                standaloneMarkers = markers;
+            }
         }
 
         function saveAndRender() {
