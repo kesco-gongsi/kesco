@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="color-scheme" content="light only">
-    <title>공시맵 2.0</title>
+    <title>공시맵 3.0</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script type="text/javascript" src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=85ad2817ce8a886974a3fce65f856ab4&libraries=services,clusterer&autoload=false"></script>
@@ -29,7 +29,9 @@
         }
         * { box-sizing: border-box; }
         body { margin: 0; padding: 0; font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif; overflow: hidden; background: var(--bg); color: var(--text); }
-        #map { width: 100%; height: 100vh; position: absolute; top: 0; left: 0; }
+        
+        /* 💡 높이 오차를 유발하던 100vh 대신 bottom: 0 으로 브라우저 뷰포트에 완벽히 고정 */
+        #map { width: 100%; position: absolute; top: 0; bottom: 0; left: 0; right: 0; }
 
         /* ── 사이드 패널 ── */
         #upload-box {
@@ -573,35 +575,48 @@
         });
         geocoder = new kakao.maps.services.Geocoder();
 
-        // 우클릭 수동 추가 이벤트
+        // 우클릭 마커 생성 (데스크탑 용)
         kakao.maps.event.addListener(map, 'rightclick', function(e) { addManualMarker(e.latLng); });
         kakao.maps.event.addListener(map, 'click', function() {
             if (currentInfoWindow) { currentInfoWindow.setMap(null); currentInfoWindow = null; }
         });
 
-        /* 모바일 롱프레스 (카카오 좌표 변환 적용) */
+        /* 🚀 롱프레스 (모바일용) - 정확한 맵 매핑을 위한 좌표 변환 수정 */
         var mapDiv = document.getElementById('map'), rippleEl = document.getElementById('longpress-ripple');
         var lpTimer = null, lpMoved = false, lpStartX, lpStartY;
+        
         function showRipple(x,y){ rippleEl.style.left=x+'px'; rippleEl.style.top=y+'px'; rippleEl.classList.add('active'); }
         function hideRipple(){ rippleEl.classList.remove('active'); }
 
         mapDiv.addEventListener('touchstart',function(e){
             if(e.touches.length>1){clearTimeout(lpTimer);hideRipple();lpMoved=true;return;}
-            lpMoved=false; lpStartX=e.touches[0].clientX; lpStartY=e.touches[0].clientY;
-            showRipple(lpStartX,lpStartY);
-            lpTimer=setTimeout(function(){
-                if(lpMoved)return;
-                var proj = map.getProjection(), rect = mapDiv.getBoundingClientRect();
+            lpMoved = false; 
+            lpStartX = e.touches[0].clientX; 
+            lpStartY = e.touches[0].clientY;
+            showRipple(lpStartX, lpStartY);
+            
+            lpTimer = setTimeout(function(){
+                if(lpMoved) return;
+                
+                // CSS 보정(bottom:0) 및 GetBoundingClientRect 조합으로 오차 제거
+                var proj = map.getProjection();
+                var rect = mapDiv.getBoundingClientRect();
                 var point = new kakao.maps.Point(lpStartX - rect.left, lpStartY - rect.top);
                 var coord = proj.coordsFromContainerPoint(point);
+                
                 if(navigator.vibrate) navigator.vibrate(50);
-                hideRipple(); addManualMarker(coord);
-            },600);
+                hideRipple(); 
+                addManualMarker(coord);
+            }, 600);
         },{passive:true});
+        
         mapDiv.addEventListener('touchmove',function(e){
             if(e.touches.length>1){clearTimeout(lpTimer);hideRipple();lpMoved=true;return;}
-            if(Math.abs(e.touches[0].clientX-lpStartX)>8||Math.abs(e.touches[0].clientY-lpStartY)>8){lpMoved=true;clearTimeout(lpTimer);hideRipple();}
+            if(Math.abs(e.touches[0].clientX-lpStartX)>8 || Math.abs(e.touches[0].clientY-lpStartY)>8){
+                lpMoved = true; clearTimeout(lpTimer); hideRipple();
+            }
         },{passive:true});
+        
         mapDiv.addEventListener('touchend',  function(){clearTimeout(lpTimer);hideRipple();},{passive:true});
         mapDiv.addEventListener('touchcancel',function(){clearTimeout(lpTimer);hideRipple();lpMoved=true;},{passive:true});
 
